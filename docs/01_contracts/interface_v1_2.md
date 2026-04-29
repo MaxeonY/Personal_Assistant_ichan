@@ -1,4 +1,4 @@
-# ICHAN Phase A 接口定稿 v1.2
+# ICHAN Phase A 接口定稿 v1.3
 
 **文件路径**: `docs/interface_v1_2.md`
 **范围**: Phase A 任务 2（动画播放器） / 任务 3（三层状态机最小可运行版）
@@ -26,6 +26,12 @@
 - §4.2 `PetEvent` 新增 `{ type: 'hungry.set'; value: boolean }`，hungry 真假翻转统一为 `dispatch(...)` 单入口。
 - §4.4 `StateMachine` 公共接口澄清：不引入 `setHungry(...)` 等绕过事件入口的 public 方法。
 - §3.4 `idle.drowsy exit` 口径统一：`4` 个源状态帧 + 目标态首帧自然衔接；若提及“第 5 帧”，仅指目标态首帧。
+
+### v1.3 变更摘要（相比 v1.2）
+- §4.2 `PetEvent` 新增 `dialog.open` / `dialog.close`，作为 talking 开关的正式意图事件。
+- 新增 `DialogOpenSource` / `DialogCloseReason` 类型定义。
+- `user.doubleClick` 降级为通知性事件，不再直接触发状态转换。
+- §3.4 `talking` 继续仅支持 `loop`，不开放 talking exit intent。
 
 ---
 
@@ -332,6 +338,9 @@ export interface SessionBootstrap {
 ### 4.2 事件（v1.0 修正版）
 
 ```ts
+export type DialogOpenSource = 'shortcut' | 'doubleClick' | 'morningRitual';
+export type DialogCloseReason = 'user' | 'timeout' | 'service_done' | 'error';
+
 /** 
  * Phase A 公共事件。
  * 
@@ -349,7 +358,7 @@ export type PetEvent =
 
   // 软打断（用户主动互动）
   | { type: 'user.pat' }
-  | { type: 'user.doubleClick' }
+  | { type: 'user.doubleClick' } // B2-9: notification-only；状态转换由 dialog.open 触发
 
   // 硬打断
   | { type: 'user.feed'; csv: File }
@@ -363,7 +372,11 @@ export type PetEvent =
   | { type: 'timer.roaming.tick' }  // 见 v1.0 修正
 
   // 位移契约
-  | { type: 'movement.arrive'; requestId: MovementRequestId; position: Coord };
+  | { type: 'movement.arrive'; requestId: MovementRequestId; position: Coord }
+
+  // B2-9: 对话开关意图
+  | { type: 'dialog.open'; source: DialogOpenSource }
+  | { type: 'dialog.close'; reason: DialogCloseReason };
 ```
 
 ### 4.3 其他定义

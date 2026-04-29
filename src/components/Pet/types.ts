@@ -140,6 +140,9 @@ export interface SessionBootstrap {
   lastExitClean: boolean;
 }
 
+export type DialogOpenSource = 'shortcut' | 'doubleClick' | 'morningRitual';
+export type DialogCloseReason = 'user' | 'timeout' | 'service_done' | 'error';
+
 /**
  * Phase A 公共事件。
  *
@@ -150,7 +153,7 @@ export type PetEvent =
   | { type: 'morningRitual.complete' }
   | { type: 'user.exit' }
   | { type: 'user.pat' }
-  | { type: 'user.doubleClick' }
+  | { type: 'user.doubleClick' } // B2-9: notification-only；状态转换由 dialog.open 触发
   | { type: 'user.feed'; csv: File }
   | { type: 'reminder.due'; target: Coord }
   | { type: 'reminder.dismiss' }
@@ -158,6 +161,8 @@ export type PetEvent =
   | { type: 'timer.drowsyToNap' }
   | { type: 'timer.roaming.tick' }
   | { type: 'movement.arrive'; requestId: MovementRequestId; position: Coord }
+  | { type: 'dialog.open'; source: DialogOpenSource }
+  | { type: 'dialog.close'; reason: DialogCloseReason }
   | { type: 'hungry.set'; value: boolean };
 
 export interface StateMachineInitOptions {
