@@ -31,9 +31,15 @@ import {
   isCompactDialogGeometryValid,
 } from "./components/Dialog/dialog-transition";
 import PetCanvas from "./components/Pet/PetCanvas";
-import type { PetEvent, PetFullState, StateMachineSnapshot } from "./components/Pet/types";
+import type {
+  DialogOpenSource,
+  PetEvent,
+  PetFullState,
+  StateMachineSnapshot,
+} from "./components/Pet/types";
 import { petBehaviorConfig } from "./config/petBehaviorConfig";
 import { useDragDropFeed } from "./hooks/useDragDropFeed";
+import { routePhysicalEventToDialogOpen } from "./integration/dialogRouter";
 import { decideHungry } from "./services/HungryDecisionService";
 import { PetContextService } from "./services/PetContextService";
 import { PetStateMachine } from "./state/StateMachine";
@@ -50,6 +56,7 @@ const {
   shortcutDebounceMs: SHORTCUT_DEBOUNCE_MS,
   statusHideMs: STATUS_HIDE_MS,
 } = petBehaviorConfig.app;
+const DIALOG_SHORTCUT = "Ctrl+Alt+T";
 const DEV_PANEL_SHORTCUT = "Ctrl+Alt+D";
 // Engine constant, do not tune
 const WINDOW_MOVEMENT_TICK_MS = 16;
@@ -121,7 +128,7 @@ interface DialogTransitionSession {
   startedAt: number;
 }
 
-type DialogOpenSource = "stateMachine" | "devMock";
+type DialogUiOpenSource = "stateMachine" | "devMock";
 
 function isDialogClosingPhase(phase: DialogTransitionPhase): boolean {
   return phase === "closing.messages" || phase === "closing.shell" || phase === "closing.window";
@@ -281,6 +288,7 @@ function App() {
   const isClickThroughRef = useRef(false);
   const toggleInFlightRef = useRef(false);
   const lastShortcutAtRef = useRef(0);
+  const lastDialogShortcutAtRef = useRef(0);
   const lastDevPanelShortcutAtRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
   const movementTickTimerRef = useRef<number | null>(null);
@@ -292,13 +300,13 @@ function App() {
   const talkingInteractionRef = useRef<TalkingInteractionHandle | null>(null);
   const dialogTransitionTokenRef = useRef(0);
   const dialogModeActiveRef = useRef(false);
-  const dialogOpenedFromRef = useRef<DialogOpenSource | null>(null);
+  const dialogOpenedFromRef = useRef<DialogUiOpenSource | null>(null);
+  const pendingDialogUiOpenRef = useRef(false);
   const dialogTransitionSessionRef = useRef<DialogTransitionSession | null>(null);
   const dialogTransitionPhaseRef = useRef<DialogTransitionPhase>("compact");
   const dialogCloseWindowSnapInFlightRef = useRef(false);
   const dialogAnchorTransitionEnabledRef = useRef(true);
   const dialogCloseReasonRef = useRef<DialogCloseReason>("user");
-  const previousMajorRef = useRef<PetFullState["major"] | null>(null);
   const ignorePatUntilMsRef = useRef(0);
   const dialogMovementResumeAtMsRef = useRef(0);
 
@@ -740,7 +748,7 @@ function App() {
     setDialogVisible(false);
   }, [dialogMounted, dialogVisible]);
 
-  const requestDialogOpen = useCallback((source: DialogOpenSource) => {
+  const requestDialogOpen = useCallback((source: DialogUiOpenSource) => {
     const phase = dialogTransitionPhaseRef.current;
     if (isDialogClosingPhase(phase)) {
       return;
@@ -763,6 +771,26 @@ function App() {
     dialogCloseReasonRef.current = "user";
     setDialogRequestedOpen(true);
   }, []);
+
+  const requestDialogOpenFromPhysicalEvent = useCallback((source: DialogOpenSource) => {
+    if (!machineReadyRef.current) {
+      return;
+    }
+
+    const snapshot = machineRef.current.getSnapshot().state;
+    const route = routePhysicalEventToDialogOpen(
+      snapshot,
+      () => dialogModeActiveRef.current,
+      source,
+    );
+
+    if (!route.shouldDispatch || !route.event) {
+      return;
+    }
+
+    pendingDialogUiOpenRef.current = true;
+    dispatch(route.event);
+  }, [dispatch]);
 
   const requestDialogClose = useCallback((reason: DialogCloseReason) => {
     dialogCloseReasonRef.current = reason;
@@ -835,8 +863,6 @@ function App() {
       machineUnsubscribeRef.current?.();
       machineUnsubscribeRef.current = machine.subscribe((nextState, snapshot) => {
         void syncWindowMovementFromState(nextState);
-        const previousMajor = previousMajorRef.current;
-
         if (
           (dialogModeActiveRef.current || performance.now() < dialogMovementResumeAtMsRef.current)
           && nextState.lifecycle === "alive"
@@ -848,16 +874,14 @@ function App() {
         }
 
         if (
+          pendingDialogUiOpenRef.current &&
           nextState.lifecycle === "alive" &&
           nextState.major === "talking" &&
-          previousMajor !== "talking"
+          !dialogModeActiveRef.current
         ) {
+          pendingDialogUiOpenRef.current = false;
           requestDialogOpen("stateMachine");
         }
-
-        // Keep dialog lifecycle UI-driven in B1-10. Formal dialog.close bridge is deferred to B2-9.
-
-        previousMajorRef.current = nextState.major;
 
         if (IS_DEV_BUILD) {
           setDevSnapshot(snapshot);
@@ -877,7 +901,6 @@ function App() {
       if (IS_DEV_BUILD) {
         setDevSnapshot(machine.getSnapshot());
       }
-      previousMajorRef.current = machine.getSnapshot().state.major;
       if (petBehaviorConfig.hungry.evaluateOnStartup) {
         void (async () => {
           try {
@@ -971,7 +994,8 @@ function App() {
     ignorePatUntilMsRef.current = performance.now()
       + Math.max(DOUBLE_CLICK_PAT_GUARD_MS, PAT_CLICK_DELAY_MS + 120);
     dispatch({ type: "user.doubleClick" });
-  }, [dispatch]);
+    requestDialogOpenFromPhysicalEvent("doubleClick");
+  }, [dispatch, requestDialogOpenFromPhysicalEvent]);
 
   const handleHitboxPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (dialogModeActiveRef.current || !event.isPrimary || event.button !== 0 || isClickThroughRef.current) {
@@ -1166,104 +1190,57 @@ function App() {
     void toggleClickThrough();
   }, [toggleClickThrough]);
 
-  const stabilizeDialogMovementVisual = useCallback(() => {
-    if (!machineReadyRef.current) {
-      return;
-    }
-
-    const snapshot = machineRef.current.getSnapshot().state;
-    if (
-      snapshot.lifecycle === "alive"
-      && snapshot.major === "idle"
-      && snapshot.idleSub === "awake"
-      && snapshot.movement.state === "roaming"
-    ) {
-      dispatch({ type: "timer.roaming.tick" });
-    }
-  }, [dispatch]);
-
-  const openDialogByStateOrFallback = useCallback(() => {
-    if (!machineReadyRef.current) {
-      stabilizeDialogMovementVisual();
-      requestDialogOpen("devMock");
-      return;
-    }
-
-    dispatch({ type: "user.doubleClick" });
-    window.setTimeout(() => {
-      const firstProbe = machineRef.current.getSnapshot().state;
-      if (firstProbe.lifecycle === "alive" && firstProbe.major === "talking") {
-        return;
-      }
-
-      if (
-        firstProbe.lifecycle === "alive"
-        && (
-          firstProbe.major === "idle"
-          || firstProbe.major === "happy"
-        )
-      ) {
-        dispatch({ type: "user.doubleClick" });
-      }
-
-      window.setTimeout(() => {
-        const secondProbe = machineRef.current.getSnapshot().state;
-        if (secondProbe.lifecycle === "alive" && secondProbe.major === "talking") {
-          return;
-        }
-        stabilizeDialogMovementVisual();
-        requestDialogOpen("devMock");
-      }, 220);
-    }, 180);
-  }, [dispatch, requestDialogOpen, stabilizeDialogMovementVisual]);
+  const openDialogFromDevMock = useCallback(() => {
+    requestDialogOpenFromPhysicalEvent("doubleClick");
+  }, [requestDialogOpenFromPhysicalEvent]);
 
   const handleDevOpenDialogMock = useCallback(() => {
-    openDialogByStateOrFallback();
-  }, [openDialogByStateOrFallback]);
+    openDialogFromDevMock();
+  }, [openDialogFromDevMock]);
 
   const handleDevAppendIchanMessage = useCallback(() => {
     if (!dialogRequestedOpen) {
-      openDialogByStateOrFallback();
+      openDialogFromDevMock();
       window.setTimeout(() => {
         talkingInteractionRef.current?.appendMockIchanMessage();
       }, DIALOG_ANIMATION.durationMs + 40);
       return;
     }
     talkingInteractionRef.current?.appendMockIchanMessage();
-  }, [dialogRequestedOpen, openDialogByStateOrFallback]);
+  }, [dialogRequestedOpen, openDialogFromDevMock]);
 
   const handleDevAppendUserMessage = useCallback(() => {
     if (!dialogRequestedOpen) {
-      openDialogByStateOrFallback();
+      openDialogFromDevMock();
       window.setTimeout(() => {
         talkingInteractionRef.current?.appendMockUserMessage();
       }, DIALOG_ANIMATION.durationMs + 40);
       return;
     }
     talkingInteractionRef.current?.appendMockUserMessage();
-  }, [dialogRequestedOpen, openDialogByStateOrFallback]);
+  }, [dialogRequestedOpen, openDialogFromDevMock]);
 
   const handleDevLongTextDemo = useCallback(() => {
     if (!dialogRequestedOpen) {
-      openDialogByStateOrFallback();
+      openDialogFromDevMock();
       window.setTimeout(() => {
         talkingInteractionRef.current?.runLongTextDemo();
       }, DIALOG_ANIMATION.durationMs + 40);
       return;
     }
     talkingInteractionRef.current?.runLongTextDemo();
-  }, [dialogRequestedOpen, openDialogByStateOrFallback]);
+  }, [dialogRequestedOpen, openDialogFromDevMock]);
 
   const handleDevHistoryReviewDemo = useCallback(() => {
     if (!dialogRequestedOpen) {
-      openDialogByStateOrFallback();
+      openDialogFromDevMock();
       window.setTimeout(() => {
         void talkingInteractionRef.current?.runHistoryReviewDemo();
       }, DIALOG_ANIMATION.durationMs + 40);
       return;
     }
     void talkingInteractionRef.current?.runHistoryReviewDemo();
-  }, [dialogRequestedOpen, openDialogByStateOrFallback]);
+  }, [dialogRequestedOpen, openDialogFromDevMock]);
 
   const handleDevCloseDialog = useCallback(() => {
     requestDialogClose("user");
@@ -1324,6 +1301,30 @@ function App() {
         failedShortcuts.push(CLICK_THROUGH_SHORTCUT);
       }
 
+      try {
+        await register(DIALOG_SHORTCUT, (event) => {
+          if (disposed) {
+            return;
+          }
+
+          const keyState = String(event.state ?? "").toLowerCase();
+          if (keyState !== "pressed") {
+            return;
+          }
+
+          const now = performance.now();
+          if (now - lastDialogShortcutAtRef.current < SHORTCUT_DEBOUNCE_MS) {
+            return;
+          }
+
+          lastDialogShortcutAtRef.current = now;
+          requestDialogOpenFromPhysicalEvent("shortcut");
+        });
+      } catch (error) {
+        console.error(`Failed to register shortcut ${DIALOG_SHORTCUT}:`, error);
+        failedShortcuts.push(DIALOG_SHORTCUT);
+      }
+
       if (IS_DEV_BUILD) {
         try {
           await register(DEV_PANEL_SHORTCUT, (event) => {
@@ -1370,7 +1371,14 @@ function App() {
         statusTimerRef.current = null;
       }
     };
-  }, [setClickThrough, setDevPanelOpenState, showStatus, toggleClickThrough, toggleDevPanel]);
+  }, [
+    requestDialogOpenFromPhysicalEvent,
+    setClickThrough,
+    setDevPanelOpenState,
+    showStatus,
+    toggleClickThrough,
+    toggleDevPanel,
+  ]);
 
   useEffect(() => {
     if (!IS_DEV_BUILD || !isDevPanelOpen) {
