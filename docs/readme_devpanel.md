@@ -61,3 +61,10 @@ All of these use existing state machine entries (`dispatch(...)` or `start(...)`
 - This is not a formal integration testing framework.
 - This does not replace real CSV / Notion / DeepSeek validation.
 
+## 5. B2-9 Force PetEvent (2026-04-29)
+
+- `Force dialog.open`: 仅 `dispatch({ type: 'dialog.open', source: 'doubleClick' })`，不设置物理路径 pending flag，因此不会自动打开 UI。
+- `Force dialog.close`: 仅 `dispatch({ type: 'dialog.close', reason: 'user' })`；若 UI 仍打开，由 `dialogStateBridge` 单向兜底关闭。
+- `Force dialog.open from drowsy`: 依次派发 `idle.timeout` -> `dialog.open`，用于验证 drowsy_exit 串行到 talking。
+- `Force dialog.open from napping`: 依次派发 `idle.timeout` -> `timer.drowsyToNap` -> `dialog.open`，用于验证 wake.from_nap 串行到 talking。
+

@@ -1232,3 +1232,38 @@ Tauri 侧在 `src-tauri/src/lib.rs` 注册上述命令，并在 `src-tauri/permi
 #### 5.12.4 结论
 
 - B2-13 已完成，FTS5 关键词召回与 recentWindow 组合上下文可用于跨会话记忆增强，且包含 FTS5 不可用时的降级路径（仅 recentWindow）。
+
+---
+
+### 5.13 B2-9
+
+执行范围与对应任务
+
+- 执行批次：Batch 2
+- 对应任务：任务9（talking 正常退出机制闭合）
+- 当前状态：已完成（2026-04-29）
+
+#### 5.13.1 实施摘要
+
+- 正式事件契约：`dialog.open` / `dialog.close` 纳入 `PetEvent`。
+- StateMachine：新增 `handleDialogOpen/handleDialogClose`，`user.doubleClick` 降级为 notification-only。
+- Router：新增 `dialogRouter`，双击与 `Ctrl+Alt+T` 统一走 `alive + idle + !dialogOpen` gate。
+- Close Bridge：新增 `dialogStateBridge`，仅处理 `talking -> non-talking` 且 UI 仍打开的单向关闭兜底。
+- DevPanel：新增 B2-9 Force PetEvent 按钮组（4个）验证开关路径。
+
+#### 5.13.2 改动清单
+
+- `src/components/Pet/types.ts`
+- `src/state/StateMachine.ts`
+- `src/integration/dialogRouter.ts`
+- `src/integration/dialogStateBridge.ts`
+- `src/App.tsx`
+- `src/components/DevPanel/DevPanel.tsx`
+- `src/state/StateMachine.dialog.test.ts`
+- `src/integration/dialogRouter.test.ts`
+- `src/integration/dialogStateBridge.test.ts`
+
+#### 5.13.3 测试执行与结果
+
+- `pnpm exec tsc --noEmit`：通过
+- `pnpm test`：通过（提权环境，规避沙箱 `spawn EPERM`）

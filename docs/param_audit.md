@@ -370,3 +370,19 @@
 | 改应用/窗口元数据 | `src-tauri/tauri.conf.json` |
 | 改动画帧时长 | `src/config/petBehaviorConfig.ts` |
 | 改数据库查询限制 | `src-tauri/src/chat/mod.rs` |
+
+---
+
+## 11. B2-9 (2026-04-29)
+
+- `interface_v1_2.md` 版本升级：`v1.2 -> v1.3`
+- `PetEvent` 新增：
+  - `{ type: 'dialog.open'; source: DialogOpenSource }`
+  - `{ type: 'dialog.close'; reason: DialogCloseReason }`
+- `DialogOpenSource = 'shortcut' | 'doubleClick' | 'morningRitual'`
+- `DialogCloseReason = 'user' | 'timeout' | 'service_done' | 'error'`
+- `user.doubleClick` 降级为通知性事件，状态转换由 `dialog.open` 驱动
+- 新增集成模块：
+  - `src/integration/dialogRouter.ts`
+  - `src/integration/dialogStateBridge.ts`
+- DevPanel 新增 B2-9 Force PetEvent 按钮组（4个）

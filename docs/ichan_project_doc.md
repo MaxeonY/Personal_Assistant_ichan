@@ -1116,6 +1116,7 @@ Gemini 写的代码由 GPT 审核。Grok 写的任何东西都由 GPT 审核。
   - [x] B1-10A 对话动效重构, Done. 长期动效规则已抽取到`docs/02_ui_schema/dialog_transition_schema.md`
   - [x] B1-12 hungry 自动判定逻辑, Done. 实施报告见`docs/03_execution/phaseb_execution_plan.md`文档`5.10`小节
 - [x] B2-13 chat 历史 FTS5 关键词记忆库, Done. 实施报告见`docs/03_execution/phaseb_execution_plan.md`文档`5.12`小节
+- [x] B2-9 talking 正常退出机制闭合, Done. 实施报告见`docs/03_execution/phaseb_execution_plan.md`文档`5.13`小节
 
 ## 附录A 关键 API 参考
 

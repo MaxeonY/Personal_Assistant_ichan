@@ -981,5 +981,8 @@ src/components/Dialog/dialog-tokens.ts
 
 ## 21. 审计对齐补充（2026-04-27）
 - B1-10 对话 UI 已落地，本文继续作为布局与交互 Schema 真值源。
-- `dialog.close` 仍属于 B2-9 阶段候选事件，不作为当前已冻结公共接口。
+- B2-9 起，`dialog.close` 已纳入正式 `PetEvent` 公共接口。
+- Esc / X / onClose 的关闭路径应并行执行：
+  - `dispatch({ type: 'dialog.close', reason: 'user' })`
+  - 现有 UI 关闭动画时序（`closing.messages -> closing.shell -> closing.window -> compact`）。
 

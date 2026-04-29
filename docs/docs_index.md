@@ -189,3 +189,17 @@ templates/ ──创建──▶ active/ ──完成──▶ done/
    - 触及对话动效 → 补 `02_ui_schema/dialog_transition_schema.md`
    - 涉及 DEV 面板 → 补 `readme_devpanel.md`
 4. 需历史追溯时 → 补 `04_task_cards/done/*` 或 `99_archive/*`
+
+---
+
+## 9. B2-9 文档同步（2026-04-29）
+
+- 本轮实现任务卡：`active/B2-9_task_card_v1.2.md`
+- 完成归档目标：`done/B2-9_task_card_v1.2.md`
+- 相关回流文档：
+  - `01_contracts/interface_v1_2.md`（v1.3）
+  - `02_ui_schema/talking_interaction_schema.md`
+  - `03_execution/phaseb_execution_plan.md`（新增 5.13）
+  - `readme_devpanel.md`
+  - `param_audit.md`
+  - `ichan_project_doc.md`
