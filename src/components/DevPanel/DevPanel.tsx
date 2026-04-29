@@ -26,6 +26,10 @@ export interface DevPanelProps {
   onForceDrowsy: () => void;
   onForceNapping: () => void;
   onForceWakeFromNap: () => void;
+  onForceDialogOpen: () => void;
+  onForceDialogClose: () => void;
+  onForceDialogOpenFromDrowsy: () => void;
+  onForceDialogOpenFromNapping: () => void;
   onRoamingPulse: () => void;
   onResetIdleAwake: () => void;
   onInjectPat: () => void;
@@ -68,6 +72,10 @@ export default function DevPanel({
   onForceDrowsy,
   onForceNapping,
   onForceWakeFromNap,
+  onForceDialogOpen,
+  onForceDialogClose,
+  onForceDialogOpenFromDrowsy,
+  onForceDialogOpenFromNapping,
   onRoamingPulse,
   onResetIdleAwake,
   onInjectPat,
@@ -115,6 +123,16 @@ export default function DevPanel({
             <button className="dev-panel__button" onClick={onForceWakeFromNap} type="button">Force wake.from_nap path</button>
             <button className="dev-panel__button" onClick={onRoamingPulse} type="button">Roaming Pulse</button>
             <button className="dev-panel__button" onClick={onResetIdleAwake} type="button">Reset idle.awake</button>
+          </div>
+        </section>
+
+        <section className="dev-panel__group">
+          <h3 className="dev-panel__group-title">Force PetEvent (B2-9)</h3>
+          <div className="dev-panel__actions">
+            <button className="dev-panel__button" onClick={onForceDialogOpen} type="button">Force dialog.open</button>
+            <button className="dev-panel__button" onClick={onForceDialogClose} type="button">Force dialog.close</button>
+            <button className="dev-panel__button" onClick={onForceDialogOpenFromDrowsy} type="button">Force dialog.open from drowsy</button>
+            <button className="dev-panel__button" onClick={onForceDialogOpenFromNapping} type="button">Force dialog.open from napping</button>
           </div>
         </section>
 

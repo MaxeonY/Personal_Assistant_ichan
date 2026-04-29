@@ -617,11 +617,6 @@ function App() {
   }, []);
 
   const finalizeDialogClose = useCallback(() => {
-    const closeReason = dialogCloseReasonRef.current;
-    if (dialogOpenedFromRef.current === "stateMachine" && closeReason === "user") {
-      // TODO(B2-9): wire dialog.close state bridge once public event contract is finalized.
-    }
-
     dialogMovementResumeAtMsRef.current = performance.now() + DIALOG_MOVEMENT_RESUME_DELAY_MS;
     dialogModeActiveRef.current = false;
     dialogOpenedFromRef.current = null;
@@ -1166,6 +1161,25 @@ function App() {
     dispatch({ type: "reminder.due", target: resolveDevReminderTarget() });
   }, [dispatch, resolveDevReminderTarget]);
 
+  const handleDevForceDialogOpen = useCallback(() => {
+    dispatch({ type: "dialog.open", source: "doubleClick" });
+  }, [dispatch]);
+
+  const handleDevForceDialogClose = useCallback(() => {
+    dispatch({ type: "dialog.close", reason: "user" });
+  }, [dispatch]);
+
+  const handleDevForceDialogOpenFromDrowsy = useCallback(() => {
+    dispatch({ type: "idle.timeout" });
+    dispatch({ type: "dialog.open", source: "doubleClick" });
+  }, [dispatch]);
+
+  const handleDevForceDialogOpenFromNapping = useCallback(() => {
+    dispatch({ type: "idle.timeout" });
+    dispatch({ type: "timer.drowsyToNap" });
+    dispatch({ type: "dialog.open", source: "doubleClick" });
+  }, [dispatch]);
+
   const handleDevRoamingPulse = useCallback(() => {
     dispatch({ type: "timer.roaming.tick" });
   }, [dispatch]);
@@ -1607,6 +1621,10 @@ function App() {
             onForceDrowsy={handleDevForceDrowsy}
             onForceNapping={handleDevForceNapping}
             onForceWakeFromNap={handleDevForceWakeFromNap}
+            onForceDialogOpen={handleDevForceDialogOpen}
+            onForceDialogClose={handleDevForceDialogClose}
+            onForceDialogOpenFromDrowsy={handleDevForceDialogOpenFromDrowsy}
+            onForceDialogOpenFromNapping={handleDevForceDialogOpenFromNapping}
             onRoamingPulse={handleDevRoamingPulse}
             onResetIdleAwake={handleDevResetIdleAwake}
             onInjectPat={handleDevInjectPat}
