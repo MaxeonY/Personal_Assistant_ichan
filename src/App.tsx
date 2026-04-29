@@ -36,10 +36,12 @@ import type {
   PetEvent,
   PetFullState,
   StateMachineSnapshot,
+  Unsubscribe,
 } from "./components/Pet/types";
 import { petBehaviorConfig } from "./config/petBehaviorConfig";
 import { useDragDropFeed } from "./hooks/useDragDropFeed";
 import { routePhysicalEventToDialogOpen } from "./integration/dialogRouter";
+import { watchTalkingExitForDialogSync } from "./integration/dialogStateBridge";
 import { decideHungry } from "./services/HungryDecisionService";
 import { PetContextService } from "./services/PetContextService";
 import { PetStateMachine } from "./state/StateMachine";
@@ -129,6 +131,13 @@ interface DialogTransitionSession {
 }
 
 type DialogUiOpenSource = "stateMachine" | "devMock";
+type RequestDialogCloseSource = "user" | "bridge";
+
+interface RequestDialogCloseOptions {
+  reason?: DialogCloseReason;
+  dispatchStateEvent?: boolean;
+  source?: RequestDialogCloseSource;
+}
 
 function isDialogClosingPhase(phase: DialogTransitionPhase): boolean {
   return phase === "closing.messages" || phase === "closing.shell" || phase === "closing.window";
@@ -302,6 +311,8 @@ function App() {
   const dialogModeActiveRef = useRef(false);
   const dialogOpenedFromRef = useRef<DialogUiOpenSource | null>(null);
   const pendingDialogUiOpenRef = useRef(false);
+  const dialogClosingInProgressRef = useRef(false);
+  const dialogBridgeUnsubscribeRef = useRef<Unsubscribe | null>(null);
   const dialogTransitionSessionRef = useRef<DialogTransitionSession | null>(null);
   const dialogTransitionPhaseRef = useRef<DialogTransitionPhase>("compact");
   const dialogCloseWindowSnapInFlightRef = useRef(false);
@@ -617,6 +628,7 @@ function App() {
     dialogCloseReasonRef.current = "user";
     dialogTransitionSessionRef.current = null;
     dialogCloseWindowSnapInFlightRef.current = false;
+    dialogClosingInProgressRef.current = false;
     setDialogMounted(false);
     setDialogVisible(false);
   }, []);
@@ -742,6 +754,7 @@ function App() {
     if (!dialogMounted && !dialogVisible) {
       dialogModeActiveRef.current = false;
       dialogOpenedFromRef.current = null;
+      dialogClosingInProgressRef.current = false;
       return;
     }
 
@@ -792,14 +805,29 @@ function App() {
     dispatch(route.event);
   }, [dispatch]);
 
-  const requestDialogClose = useCallback((reason: DialogCloseReason) => {
-    dialogCloseReasonRef.current = reason;
-    if (machineReadyRef.current) {
-      const snapshot = machineRef.current.getSnapshot().state;
-      if (snapshot.lifecycle === "alive" && snapshot.major === "talking") {
-        dispatch({ type: "user.pat" });
-      }
+  const requestDialogClose = useCallback((options: RequestDialogCloseOptions = {}) => {
+    const {
+      reason = "user",
+      dispatchStateEvent = true,
+      source = "user",
+    } = options;
+
+    if (!dialogModeActiveRef.current) {
+      return;
     }
+
+    if (dialogClosingInProgressRef.current) {
+      return;
+    }
+
+    dialogClosingInProgressRef.current = true;
+    dialogCloseReasonRef.current = reason;
+    void source;
+
+    if (dispatchStateEvent && machineReadyRef.current) {
+      dispatch({ type: "dialog.close", reason });
+    }
+
     setDialogRequestedOpen(false);
   }, [dispatch]);
 
@@ -893,6 +921,19 @@ function App() {
         }
       });
 
+      dialogBridgeUnsubscribeRef.current?.();
+      dialogBridgeUnsubscribeRef.current = watchTalkingExitForDialogSync(
+        machineRef.current,
+        () => dialogModeActiveRef.current && !dialogClosingInProgressRef.current,
+        () => {
+          requestDialogClose({
+            reason: "user",
+            dispatchStateEvent: false,
+            source: "bridge",
+          });
+        },
+      );
+
       // TODO(Phase B): Load real values from SQLite PetContext.
       machine.start({
         isNewDay: false,
@@ -938,7 +979,7 @@ function App() {
       pendingExitRef.current = false;
       allowWindowCloseRef.current = false;
     },
-    [requestDialogOpen, syncWindowMovementFromState],
+    [requestDialogClose, requestDialogOpen, syncWindowMovementFromState],
   );
 
   const handlePatClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
@@ -1243,7 +1284,7 @@ function App() {
   }, [dialogRequestedOpen, openDialogFromDevMock]);
 
   const handleDevCloseDialog = useCallback(() => {
-    requestDialogClose("user");
+    requestDialogClose({ reason: "user", dispatchStateEvent: true, source: "user" });
   }, [requestDialogClose]);
 
   useEffect(() => {
@@ -1493,6 +1534,8 @@ function App() {
       stopWindowMovementLoop();
       machineUnsubscribeRef.current?.();
       machineUnsubscribeRef.current = null;
+      dialogBridgeUnsubscribeRef.current?.();
+      dialogBridgeUnsubscribeRef.current = null;
       machineRef.current.destroy();
       machineReadyRef.current = false;
       isDevPanelOpenRef.current = false;
@@ -1532,7 +1575,7 @@ function App() {
           ref={talkingInteractionRef}
           open={dialogMounted}
           visible={dialogVisible}
-          onRequestClose={(reason) => requestDialogClose(reason)}
+          onRequestClose={(reason) => requestDialogClose({ reason, dispatchStateEvent: true, source: "user" })}
           onTransitionPhaseChange={handleDialogTransitionPhaseChange}
           onClosingWindowPhase={handleDialogClosingWindowPhase}
         />
