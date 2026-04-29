@@ -163,7 +163,10 @@ export class DeepSeekService {
   constructor(options: DeepSeekServiceOptions = {}) {
     this.tokenProvider =
       options.tokenProvider ?? readDeepSeekTokenFromTauriConfig;
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // Bind to globalThis to avoid "Illegal invocation" in WebView when called
+    // via a stored function reference.
+    this.fetchImpl =
+      options.fetchImpl ?? globalThis.fetch.bind(globalThis);
 
     // 三段拼装并缓存
     const base = BASE_PERSONA + "\n\n" + OUTPUT_CONSTRAINTS;

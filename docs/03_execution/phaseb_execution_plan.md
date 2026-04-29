@@ -780,6 +780,23 @@ Tauri 侧在 `src-tauri/src/lib.rs` 注册上述命令，并在 `src-tauri/permi
   5. 设置 `DEEPSEEK_DEV_TRACE=1` 跑一次后查看 console 输出，确认 prompt 字面与 spec §1+§2+§3 三段拼接一致。
   6. 验收通过后 token 保留。
 
+#### 5.5.5 - Bug Fix
+
+- 问题现象：
+  - 对话调用 DeepSeek 时控制台报错：`[DeepSeek ERROR] scene=chat error=Failed to execute 'fetch' on 'Window': Illegal invocation`。
+  - 结果表现为 `chat()` 每次失败并回落到兜底文案。
+- 根因分析：
+  - `DeepSeekService` 构造函数中将 `fetch` 作为裸函数引用保存（`this.fetchImpl = fetch`）。
+  - 在 Tauri WebView 环境中，裸调用会丢失 `Window` 调用上下文，触发 `Illegal invocation`。
+- 修复方案：
+  - 在 `src/services/DeepSeekService.ts` 中将默认 fetch 实现改为绑定调用上下文：
+    - `this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);`
+- 影响范围：
+  - 仅影响 DeepSeek HTTP 调用层，不改变 B1-4 的接口契约、返回类型与降级策略。
+- 验证结果：
+  - `pnpm exec tsc --noEmit` 通过。
+  - 运行时不再出现 `Illegal invocation`，后续是否走降级仅取决于 API key/网络/HTTP 状态。
+
 ---
 
 ### 5.6 B1-7
@@ -1267,3 +1284,50 @@ Tauri 侧在 `src-tauri/src/lib.rs` 注册上述命令，并在 `src-tauri/permi
 
 - `pnpm exec tsc --noEmit`：通过
 - `pnpm test`：通过（提权环境，规避沙箱 `spawn EPERM`）
+
+#### 5.13.4 - Bug Fix
+
+问题现象汇总（验收阶段）
+
+- 现象 1：双击宠物后应用闪退，或进入 `talking` 后立即被打回 `idle`，对话 UI 未稳定展示。
+- 现象 2：DevPanel `Force talking` 直接切动画，不经过对话 UI；`Force dialog.open` 行为与预期理解不一致。
+- 现象 3：对话 UI 只渲染局部（窗口被裁切），输入区/面板显示不完整。
+- 现象 4：`Force dialog.open from drowsy` / `from napping` 时，未出现对话 UI；Esc 在部分场景无效，只能 Force close 退出。
+
+排查方式与证据链
+
+- 前端增加结构化调试日志，覆盖 open/close 全链路：
+  - `ui.doubleClick.begin`、`dialog.open.request`、`dialog.open.transition.*`
+  - `dialog.bridge.triggered`、`dialog.close.request.accepted`
+  - `machine.start.done`、`app.mount` / `app.unmount`
+- 将日志持久化到 `localStorage`，并提供回放与清理入口，确保闪退后可复盘。
+- 关键日志结论：
+  - `dialog.open` 请求已被接受并执行，但随后极短时间触发 `dialog.bridge.triggered -> dialog.close.request.accepted`，并伴随 `machine.start.done` 重入，说明存在生命周期重置导致的“打开后立刻关闭”。
+  - DevPanel Force open 路径未设置 pending UI open 标记时，不会自动打开 UI；该行为与 B2-9 任务卡语义一致（非缺陷）。
+  - UI 裁切与窗口几何过渡开关/窗口尺寸切换链路相关，属于实现问题，不是状态机事件语义问题。
+
+根因定位
+
+- 根因 A（主因，闪退/瞬关）：`PetCanvas` 生命周期不稳定，player 在渲染过程中被重复创建，`onReady` 多次触发，`handlePlayerReady` 内重复 `machine.start()`，造成状态机重启与 bridge close 连锁触发。
+- 根因 B（显示不完整）：临时关闭 geometry transition 的兜底策略导致窗口尺寸与 UI 容器不一致，出现“仅显示局部”。
+- 根因 C（预期偏差）：DevPanel Force 系列按钮是“事件层隔离验证”，按设计不承担 UI 自动打开职责；文档旧版本存在口径混杂，导致验收预期偏移。
+- 根因 D（Esc 失效的场景性问题）：当 UI 未进入稳定对话态或焦点不在对话层时，局部按键监听无法覆盖。
+
+修复方案与落地
+
+- 修复 1：稳定 `PetCanvas` player 生命周期，避免因 `displayHeightPx/onReady` 变化重建 player。
+  - 在 `PetCanvas` 中使用 `onReadyRef` 持有最新回调，减少 effect 依赖导致的重建。
+- 修复 2：为 `handlePlayerReady` 增加启动幂等保护。
+  - `machineReadyRef.current` 已为 true 时仅 `machine.init(player)`，跳过二次 `machine.start()`。
+- 修复 3：恢复并校正 dialog 窗口几何过渡链路，移除“geometry disabled”临时绕行造成的裁切副作用。
+- 修复 4：调整 DevPanel 的 drowsy/napping force 打开路径实现，先构造状态路径再走物理事件路由，保证与主链路一致的 pending 消费行为。
+- 修复 5：增加 App 级 Esc fallback（capture 阶段），在 dialog active 时强制走 `requestDialogClose`，补齐焦点异常场景。
+- 修复 6：补充调试与防护日志点，覆盖 open/close 请求、bridge 触发、状态订阅与过渡完成事件，便于后续复盘。
+
+最终结论与经验沉淀
+
+- B2-9 当前问题以“实施缺陷”为主，不是架构主线错误。
+- DevPanel `Force dialog.open` 不自动开 UI 属于设计约束；真实开链路应以“双击/快捷键物理输入 -> router -> dialog.open -> pending consume -> UI open”为准。
+- 文档治理结论：
+  - 以 `B2-9_task_card_v1.2.md` + `B2-9_implementation_details_v0.2.md` + `B2-9_architecture_v0.3_patch.md` 作为有效口径；
+  - `B2-9_architecture_v0.2.md` 与 `B2-9_implementation_details_v0.1.md` 仅保留历史参考，避免继续用于验收判定。

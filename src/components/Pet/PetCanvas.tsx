@@ -33,6 +33,11 @@ export function PetCanvas({
 }: PetCanvasProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<SpriteAnimationPlayer | null>(null);
+  const onReadyRef = useRef<typeof onReady>(onReady);
+
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
 
   useEffect(() => {
     if (!rootRef.current) {
@@ -47,7 +52,7 @@ export function PetCanvas({
 
     const player = new SpriteAnimationPlayer(options);
     playerRef.current = player;
-    onReady?.(player);
+    onReadyRef.current?.(player);
 
     let disposed = false;
 
@@ -68,7 +73,9 @@ export function PetCanvas({
       player.dispose();
       playerRef.current = null;
     };
-  }, [assetRoot, autoPlay, autoPreload, displayHeightPx, onReady]);
+    // Keep player lifecycle stable across dialog mode toggles.
+    // Recreating player during open transition can reset runtime state unexpectedly.
+  }, [assetRoot, autoPlay, autoPreload]);
 
   return (
     <div

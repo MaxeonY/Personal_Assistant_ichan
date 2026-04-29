@@ -26,6 +26,7 @@ import {
   COMPACT_WINDOW,
   DIALOG_WINDOW,
   assertCompactDialogGeometry,
+  getCompactDialogGeometryIssues,
   getCompactWindowPositionFromDialog,
   getDialogWindowPositionFromCompact,
   isCompactDialogGeometryValid,
@@ -46,6 +47,13 @@ import { decideHungry } from "./services/HungryDecisionService";
 import { PetContextService } from "./services/PetContextService";
 import { PetStateMachine } from "./state/StateMachine";
 import type { TimerBackend } from "./state/timers";
+import {
+  clearDialogDebugLogs,
+  getDialogDebugLogsFromStorage,
+  installDialogDebugGuards,
+  logDialogDebug,
+  replayDialogDebugLogsFromStorage,
+} from "./utils/dialogDebugLogger";
 import "./App.css";
 
 const IS_DEV_BUILD = import.meta.env.DEV;
@@ -66,6 +74,8 @@ const HITBOX_DRAG_START_THRESHOLD_PX = 6;
 const PAT_CLICK_DELAY_MS = 520;
 const DOUBLE_CLICK_PAT_GUARD_MS = 720;
 const DIALOG_MOVEMENT_RESUME_DELAY_MS = 220;
+// Temporary safety switch: avoid native window geometry operations during dialog transition.
+const ENABLE_DIALOG_WINDOW_GEOMETRY_TRANSITION = true;
 // Engine constant, do not tune
 const DEV_PANEL_TIMER_REFRESH_MS = 120;
 const DEV_PANEL_DOCK_WIDTH_PX = 360;
@@ -269,6 +279,21 @@ function createInitialHitboxPointerGesture(): HitboxPointerGesture {
   };
 }
 
+function shouldLogDialogPetEvent(event: PetEvent): boolean {
+  switch (event.type) {
+    case "user.doubleClick":
+    case "dialog.open":
+    case "dialog.close":
+    case "user.feed":
+    case "reminder.due":
+    case "idle.timeout":
+    case "timer.drowsyToNap":
+      return true;
+    default:
+      return false;
+  }
+}
+
 function App() {
   const appWindowRef = useRef<ReturnType<typeof getCurrentWindow> | null>(null);
   if (appWindowRef.current === null) {
@@ -378,16 +403,80 @@ function App() {
     : 0;
 
   useEffect(() => {
-    const geometryValid = isCompactDialogGeometryValid();
-    if (!geometryValid) {
-      assertCompactDialogGeometry();
+    if (!IS_DEV_BUILD) {
+      return;
     }
-    dialogAnchorTransitionEnabledRef.current = geometryValid;
+
+    replayDialogDebugLogsFromStorage();
+    installDialogDebugGuards({
+      geometryTransitionEnabled: ENABLE_DIALOG_WINDOW_GEOMETRY_TRANSITION,
+      dialogShortcut: DIALOG_SHORTCUT,
+      clickThroughShortcut: CLICK_THROUGH_SHORTCUT,
+    });
+    (
+      window as typeof window & {
+        __clearIchanDialogDebugLogs?: () => void;
+        __getIchanDialogDebugLogs?: () => unknown;
+      }
+    ).__clearIchanDialogDebugLogs = clearDialogDebugLogs;
+    (
+      window as typeof window & {
+        __clearIchanDialogDebugLogs?: () => void;
+        __getIchanDialogDebugLogs?: () => unknown;
+      }
+    ).__getIchanDialogDebugLogs = getDialogDebugLogsFromStorage;
+
+    logDialogDebug("app.mount", {
+      geometryIssues: getCompactDialogGeometryIssues(),
+      geometryTransitionEnabled: ENABLE_DIALOG_WINDOW_GEOMETRY_TRANSITION,
+    });
+
+    return () => {
+      logDialogDebug("app.unmount");
+    };
   }, []);
+
+  const resolveDialogAnchorTransitionEnabled = useCallback((): boolean => {
+    const geometryValid = isCompactDialogGeometryValid();
+    if (geometryValid) {
+      logDialogDebug("dialog.geometry.valid");
+      return true;
+    }
+
+    try {
+      assertCompactDialogGeometry();
+    } catch (error) {
+      // In DEV, geometry assertion may throw. Keep app alive and fallback to non-anchor open path.
+      console.error("Dialog geometry assertion failed, fallback to non-anchor transition:", error);
+      showStatus("Dialog geometry drift detected; fallback transition enabled", 2400);
+      logDialogDebug("dialog.geometry.assertion.failed", {
+        error,
+        issues: getCompactDialogGeometryIssues(),
+      });
+    }
+
+    logDialogDebug("dialog.geometry.fallback.disabled-anchor", {
+      issues: getCompactDialogGeometryIssues(),
+    });
+    return false;
+  }, [showStatus]);
+
+  useEffect(() => {
+    dialogAnchorTransitionEnabledRef.current = resolveDialogAnchorTransitionEnabled();
+  }, [resolveDialogAnchorTransitionEnabled]);
 
   const dispatch = useCallback((event: PetEvent) => {
     if (!machineReadyRef.current) {
+      if (shouldLogDialogPetEvent(event)) {
+        logDialogDebug("petEvent.drop.machineNotReady", { event });
+      }
       return;
+    }
+    if (shouldLogDialogPetEvent(event)) {
+      logDialogDebug("petEvent.dispatch", {
+        event,
+        snapshot: machineRef.current.getSnapshot().state,
+      });
     }
     machineRef.current.dispatch(event);
   }, []);
@@ -611,12 +700,19 @@ function App() {
   }, [appWindow]);
 
   const setIgnoreCursorEventsSilently = useCallback(async (ignore: boolean) => {
+    logDialogDebug("cursorEvents.set.begin", { ignore });
     await invoke("set_ignore_cursor_events", { ignore });
     isClickThroughRef.current = ignore;
     setIsClickThrough(ignore);
+    logDialogDebug("cursorEvents.set.done", { ignore });
   }, []);
 
   const finalizeDialogClose = useCallback(() => {
+    logDialogDebug("dialog.close.finalize.begin", {
+      closeReason: dialogCloseReasonRef.current,
+      openedFrom: dialogOpenedFromRef.current,
+      wasDialogActive: dialogModeActiveRef.current,
+    });
     dialogMovementResumeAtMsRef.current = performance.now() + DIALOG_MOVEMENT_RESUME_DELAY_MS;
     dialogModeActiveRef.current = false;
     dialogOpenedFromRef.current = null;
@@ -626,9 +722,23 @@ function App() {
     dialogClosingInProgressRef.current = false;
     setDialogMounted(false);
     setDialogVisible(false);
+    logDialogDebug("dialog.close.finalize.done");
   }, []);
 
   const runDialogCloseWindowSnap = useCallback(async () => {
+    if (!ENABLE_DIALOG_WINDOW_GEOMETRY_TRANSITION) {
+      const previousIgnore = dialogTransitionSessionRef.current?.previousCompactIgnoreCursorEvents ?? false;
+      try {
+        logDialogDebug("dialog.close.windowSnap.fallback.begin", { previousIgnore });
+        await setIgnoreCursorEventsSilently(previousIgnore);
+        logDialogDebug("dialog.close.windowSnap.fallback.done", { previousIgnore });
+      } catch (error) {
+        console.error("Failed to restore cursor-events during close fallback:", error);
+        logDialogDebug("dialog.close.windowSnap.fallback.error", { error });
+      }
+      return;
+    }
+
     if (dialogCloseWindowSnapInFlightRef.current) {
       return;
     }
@@ -668,10 +778,17 @@ function App() {
 
   const runDialogOpenTransition = useCallback(async () => {
     const transitionToken = ++dialogTransitionTokenRef.current;
+    logDialogDebug("dialog.open.transition.begin", {
+      transitionToken,
+      dialogMounted,
+      dialogVisible,
+      anchorEnabled: dialogAnchorTransitionEnabledRef.current,
+    });
 
     if (dialogMounted) {
       dialogModeActiveRef.current = true;
       setDialogVisible(true);
+      logDialogDebug("dialog.open.transition.shortCircuit.alreadyMounted", { transitionToken });
       return;
     }
 
@@ -686,6 +803,19 @@ function App() {
     }
 
     try {
+      if (!ENABLE_DIALOG_WINDOW_GEOMETRY_TRANSITION) {
+        logDialogDebug("dialog.open.transition.geometry.disabled", { transitionToken });
+        await setIgnoreCursorEventsSilently(false);
+        dialogModeActiveRef.current = true;
+        setDialogMounted(true);
+        setDialogVisible(true);
+        logDialogDebug("dialog.open.transition.done", {
+          transitionToken,
+          mode: "geometry-disabled",
+        });
+        return;
+      }
+
       const [outerPosition, scaleFactor] = await Promise.all([
         appWindow.outerPosition(),
         readWindowScaleFactor(),
@@ -730,9 +860,14 @@ function App() {
       dialogModeActiveRef.current = true;
       setDialogMounted(true);
       setDialogVisible(true);
+      logDialogDebug("dialog.open.transition.done", {
+        transitionToken,
+        mode: "geometry-enabled",
+      });
     } catch (error) {
       console.error("Failed to open dialog window:", error);
       showStatus("Dialog open transition failed", 2200);
+      logDialogDebug("dialog.open.transition.error", { transitionToken, error });
     }
   }, [
     appWindow,
@@ -745,31 +880,42 @@ function App() {
 
   const runDialogCloseTransition = useCallback(async () => {
     ++dialogTransitionTokenRef.current;
+    logDialogDebug("dialog.close.transition.begin", {
+      dialogMounted,
+      dialogVisible,
+    });
 
     if (!dialogMounted && !dialogVisible) {
       dialogModeActiveRef.current = false;
       dialogOpenedFromRef.current = null;
       dialogClosingInProgressRef.current = false;
+      logDialogDebug("dialog.close.transition.shortCircuit.notMounted");
       return;
     }
 
     setDialogVisible(false);
+    logDialogDebug("dialog.close.transition.setVisibleFalse");
   }, [dialogMounted, dialogVisible]);
 
   const requestDialogOpen = useCallback((source: DialogUiOpenSource) => {
     const phase = dialogTransitionPhaseRef.current;
+    logDialogDebug("dialog.open.request", {
+      source,
+      phase,
+      dialogModeActive: dialogModeActiveRef.current,
+      dialogMounted,
+      dialogVisible,
+    });
     if (isDialogClosingPhase(phase)) {
+      logDialogDebug("dialog.open.request.reject.closingPhase", { source, phase });
       return;
     }
     if (phase === "opening" || phase === "open" || phase === "measuring") {
+      logDialogDebug("dialog.open.request.reject.activePhase", { source, phase });
       return;
     }
 
-    const geometryValid = isCompactDialogGeometryValid();
-    if (!geometryValid) {
-      assertCompactDialogGeometry();
-    }
-    dialogAnchorTransitionEnabledRef.current = geometryValid;
+    dialogAnchorTransitionEnabledRef.current = resolveDialogAnchorTransitionEnabled();
 
     dialogTransitionSessionRef.current = {
       previousCompactIgnoreCursorEvents: isClickThroughRef.current,
@@ -778,10 +924,12 @@ function App() {
     dialogOpenedFromRef.current = source;
     dialogCloseReasonRef.current = "user";
     setDialogRequestedOpen(true);
-  }, []);
+    logDialogDebug("dialog.open.request.accepted", { source });
+  }, [dialogMounted, dialogVisible, resolveDialogAnchorTransitionEnabled]);
 
   const requestDialogOpenFromPhysicalEvent = useCallback((source: DialogOpenSource) => {
     if (!machineReadyRef.current) {
+      logDialogDebug("dialog.open.physical.drop.machineNotReady", { source });
       return;
     }
 
@@ -791,12 +939,20 @@ function App() {
       () => dialogModeActiveRef.current,
       source,
     );
+    logDialogDebug("dialog.open.physical.route", {
+      source,
+      snapshot,
+      shouldDispatch: route.shouldDispatch,
+      event: route.event,
+    });
 
     if (!route.shouldDispatch || !route.event) {
+      logDialogDebug("dialog.open.physical.reject", { source, snapshot });
       return;
     }
 
     pendingDialogUiOpenRef.current = true;
+    logDialogDebug("dialog.open.physical.accepted.pendingSet", { source });
     dispatch(route.event);
   }, [dispatch]);
 
@@ -808,16 +964,23 @@ function App() {
     } = options;
 
     if (!dialogModeActiveRef.current) {
+      logDialogDebug("dialog.close.request.reject.dialogNotActive", options);
       return;
     }
 
     if (dialogClosingInProgressRef.current) {
+      logDialogDebug("dialog.close.request.reject.closingInProgress", options);
       return;
     }
 
     dialogClosingInProgressRef.current = true;
     dialogCloseReasonRef.current = reason;
     void source;
+    logDialogDebug("dialog.close.request.accepted", {
+      reason,
+      dispatchStateEvent,
+      source,
+    });
 
     if (dispatchStateEvent && machineReadyRef.current) {
       dispatch({ type: "dialog.close", reason });
@@ -825,6 +988,28 @@ function App() {
 
     setDialogRequestedOpen(false);
   }, [dispatch]);
+
+  useEffect(() => {
+    const handleGlobalEsc = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      if (!dialogModeActiveRef.current) {
+        return;
+      }
+
+      logDialogDebug("dialog.close.globalEsc.capture", {
+        targetTag: (event.target as HTMLElement | null)?.tagName ?? null,
+      });
+      event.preventDefault();
+      requestDialogClose({ reason: "user", dispatchStateEvent: true, source: "user" });
+    };
+
+    window.addEventListener("keydown", handleGlobalEsc, true);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalEsc, true);
+    };
+  }, [requestDialogClose]);
 
   const handleDialogTransitionPhaseChange = useCallback((phase: DialogTransitionPhase) => {
     dialogTransitionPhaseRef.current = phase;
@@ -881,10 +1066,25 @@ function App() {
   const handlePlayerReady = useCallback(
     (player: AnimationPlayer) => {
       const machine = machineRef.current;
+      if (machineReadyRef.current) {
+        logDialogDebug("player.ready.rebind.skipMachineRestart", {
+          state: machine.getSnapshot().state,
+        });
+        machine.init(player);
+        return;
+      }
+
       machine.init(player);
 
       machineUnsubscribeRef.current?.();
       machineUnsubscribeRef.current = machine.subscribe((nextState, snapshot) => {
+        if (pendingDialogUiOpenRef.current || nextState.major === "talking") {
+          logDialogDebug("machine.subscribe.tick", {
+            pendingDialogUiOpen: pendingDialogUiOpenRef.current,
+            nextState,
+            dialogModeActive: dialogModeActiveRef.current,
+          });
+        }
         void syncWindowMovementFromState(nextState);
         if (
           (dialogModeActiveRef.current || performance.now() < dialogMovementResumeAtMsRef.current)
@@ -903,6 +1103,10 @@ function App() {
           !dialogModeActiveRef.current
         ) {
           pendingDialogUiOpenRef.current = false;
+          logDialogDebug("dialog.open.pending.consume", {
+            nextState,
+            openedFrom: "stateMachine",
+          });
           requestDialogOpen("stateMachine");
         }
 
@@ -921,6 +1125,10 @@ function App() {
         machineRef.current,
         () => dialogModeActiveRef.current && !dialogClosingInProgressRef.current,
         () => {
+          logDialogDebug("dialog.bridge.triggered", {
+            dialogModeActive: dialogModeActiveRef.current,
+            dialogClosingInProgress: dialogClosingInProgressRef.current,
+          });
           requestDialogClose({
             reason: "user",
             dispatchStateEvent: false,
@@ -933,6 +1141,9 @@ function App() {
       machine.start({
         isNewDay: false,
         lastExitClean: true,
+      });
+      logDialogDebug("machine.start.done", {
+        state: machine.getSnapshot().state,
       });
       if (IS_DEV_BUILD) {
         setDevSnapshot(machine.getSnapshot());
@@ -1013,13 +1224,19 @@ function App() {
 
   const handleDoubleClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
+    logDialogDebug("ui.doubleClick.begin", {
+      dialogModeActive: dialogModeActiveRef.current,
+      suppressPatClick: suppressPatClickRef.current,
+    });
 
     if (dialogModeActiveRef.current) {
+      logDialogDebug("ui.doubleClick.reject.dialogModeActive");
       return;
     }
 
     if (suppressPatClickRef.current) {
       suppressPatClickRef.current = false;
+      logDialogDebug("ui.doubleClick.reject.suppressPatClick");
       return;
     }
 
@@ -1031,6 +1248,7 @@ function App() {
       + Math.max(DOUBLE_CLICK_PAT_GUARD_MS, PAT_CLICK_DELAY_MS + 120);
     dispatch({ type: "user.doubleClick" });
     requestDialogOpenFromPhysicalEvent("doubleClick");
+    logDialogDebug("ui.doubleClick.dispatched");
   }, [dispatch, requestDialogOpenFromPhysicalEvent]);
 
   const handleHitboxPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -1162,23 +1380,47 @@ function App() {
   }, [dispatch, resolveDevReminderTarget]);
 
   const handleDevForceDialogOpen = useCallback(() => {
-    dispatch({ type: "dialog.open", source: "doubleClick" });
-  }, [dispatch]);
+    logDialogDebug("dev.forceDialogOpen.click");
+    requestDialogOpenFromPhysicalEvent("doubleClick");
+  }, [requestDialogOpenFromPhysicalEvent]);
 
   const handleDevForceDialogClose = useCallback(() => {
     dispatch({ type: "dialog.close", reason: "user" });
   }, [dispatch]);
 
+  const ensureAliveIdleForForceDialogOpen = useCallback(() => {
+    if (!machineReadyRef.current) {
+      return;
+    }
+
+    const state = machineRef.current.getSnapshot().state;
+    if (state.lifecycle === "alive" && state.major === "idle") {
+      return;
+    }
+
+    machineRef.current.start({
+      isNewDay: false,
+      lastExitClean: true,
+    });
+    if (IS_DEV_BUILD) {
+      setDevSnapshot(machineRef.current.getSnapshot());
+    }
+  }, []);
+
   const handleDevForceDialogOpenFromDrowsy = useCallback(() => {
+    logDialogDebug("dev.forceDialogOpen.fromDrowsy.click");
+    ensureAliveIdleForForceDialogOpen();
     dispatch({ type: "idle.timeout" });
-    dispatch({ type: "dialog.open", source: "doubleClick" });
-  }, [dispatch]);
+    requestDialogOpenFromPhysicalEvent("doubleClick");
+  }, [dispatch, ensureAliveIdleForForceDialogOpen, requestDialogOpenFromPhysicalEvent]);
 
   const handleDevForceDialogOpenFromNapping = useCallback(() => {
+    logDialogDebug("dev.forceDialogOpen.fromNapping.click");
+    ensureAliveIdleForForceDialogOpen();
     dispatch({ type: "idle.timeout" });
     dispatch({ type: "timer.drowsyToNap" });
-    dispatch({ type: "dialog.open", source: "doubleClick" });
-  }, [dispatch]);
+    requestDialogOpenFromPhysicalEvent("doubleClick");
+  }, [dispatch, ensureAliveIdleForForceDialogOpen, requestDialogOpenFromPhysicalEvent]);
 
   const handleDevRoamingPulse = useCallback(() => {
     dispatch({ type: "timer.roaming.tick" });
