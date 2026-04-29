@@ -1,0 +1,37 @@
+[default]
+description = "Default permissions for chat commands"
+permissions = [
+  "allow-chat-append-message",
+  "allow-chat-list-by-session",
+  "allow-chat-list-recent"
+]
+
+[[permission]]
+identifier = "allow-chat-append-message"
+description = "Enables chat_append_message command."
+commands.allow = ["chat_append_message"]
+
+[[permission]]
+identifier = "deny-chat-append-message"
+description = "Denies chat_append_message command."
+commands.deny = ["chat_append_message"]
+
+[[permission]]
+identifier = "allow-chat-list-by-session"
+description = "Enables chat_list_by_session command."
+commands.allow = ["chat_list_by_session"]
+
+[[permission]]
+identifier = "deny-chat-list-by-session"
+description = "Denies chat_list_by_session command."
+commands.deny = ["chat_list_by_session"]
+
+[[permission]]
+identifier = "allow-chat-list-recent"
+description = "Enables chat_list_recent command."
+commands.allow = ["chat_list_recent"]
+
+[[permission]]
+identifier = "deny-chat-list-recent"
+description = "Denies chat_list_recent command."
+commands.deny = ["chat_list_recent"]

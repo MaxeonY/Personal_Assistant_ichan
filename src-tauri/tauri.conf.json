@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "desktop-pet",
+  "version": "0.1.0",
+  "identifier": "com.root.desktop-pet",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "pet",
+        "title": "iChan",
+        "url": "index.html",
+        "width": 380,
+        "height": 290,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "minimizable": false,
+        "maximizable": false,
+        "closable": true,
+        "visible": false
+      },
+      {
+        "label": "wizard",
+        "title": "First Run Setup",
+        "url": "src/wizard/index.html",
+        "width": 1024,
+        "height": 768,
+        "transparent": true,
+        "decorations": false,
+        "center": true,
+        "resizable": false,
+        "minimizable": true,
+        "maximizable": true,
+        "closable": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

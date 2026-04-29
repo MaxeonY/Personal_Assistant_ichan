@@ -1,0 +1,26 @@
+[default]
+description = "Default permissions for config commands"
+permissions = [
+  "allow-config-get-value",
+  "allow-config-set-value"
+]
+
+[[permission]]
+identifier = "allow-config-get-value"
+description = "Enables config_get_value command."
+commands.allow = ["config_get_value"]
+
+[[permission]]
+identifier = "deny-config-get-value"
+description = "Denies config_get_value command."
+commands.deny = ["config_get_value"]
+
+[[permission]]
+identifier = "allow-config-set-value"
+description = "Enables config_set_value command."
+commands.allow = ["config_set_value"]
+
+[[permission]]
+identifier = "deny-config-set-value"
+description = "Denies config_set_value command."
+commands.deny = ["config_set_value"]

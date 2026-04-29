@@ -1,0 +1,37 @@
+[default]
+description = "Default permissions for workout commands"
+permissions = [
+  "allow-workout-import-csv",
+  "allow-workout-get-last-workout",
+  "allow-workout-get-body-part-recency"
+]
+
+[[permission]]
+identifier = "allow-workout-import-csv"
+description = "Enables workout_import_csv command."
+commands.allow = ["workout_import_csv"]
+
+[[permission]]
+identifier = "deny-workout-import-csv"
+description = "Denies workout_import_csv command."
+commands.deny = ["workout_import_csv"]
+
+[[permission]]
+identifier = "allow-workout-get-last-workout"
+description = "Enables workout_get_last_workout command."
+commands.allow = ["workout_get_last_workout"]
+
+[[permission]]
+identifier = "deny-workout-get-last-workout"
+description = "Denies workout_get_last_workout command."
+commands.deny = ["workout_get_last_workout"]
+
+[[permission]]
+identifier = "allow-workout-get-body-part-recency"
+description = "Enables workout_get_body_part_recency command."
+commands.allow = ["workout_get_body_part_recency"]
+
+[[permission]]
+identifier = "deny-workout-get-body-part-recency"
+description = "Denies workout_get_body_part_recency command."
+commands.deny = ["workout_get_body_part_recency"]

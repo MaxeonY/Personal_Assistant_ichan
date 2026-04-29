@@ -1,0 +1,13 @@
+[default]
+description = "Default permissions for the set_ignore_cursor_events command"
+permissions = ["allow-set-ignore-cursor-events"]
+
+[[permission]]
+identifier = "allow-set-ignore-cursor-events"
+description = "Enables the set_ignore_cursor_events command."
+commands.allow = ["set_ignore_cursor_events"]
+
+[[permission]]
+identifier = "deny-set-ignore-cursor-events"
+description = "Denies the set_ignore_cursor_events command."
+commands.deny = ["set_ignore_cursor_events"]

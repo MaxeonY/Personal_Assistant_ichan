@@ -1,0 +1,46 @@
+[default]
+description = "Default permissions for first-run wizard and window custom commands"
+permissions = [
+  "allow-first-run-complete",
+  "allow-first-run-close-wizard",
+  "allow-window-minimize",
+  "allow-window-toggle-maximize",
+  "allow-first-run-check-notion-user",
+  "allow-first-run-check-notion-database",
+  "allow-first-run-check-deepseek",
+]
+
+[[permission]]
+identifier = "allow-first-run-complete"
+description = "Enables completing the first-run wizard and switching windows."
+commands.allow = ["first_run_complete"]
+
+[[permission]]
+identifier = "allow-first-run-close-wizard"
+description = "Enables closing the first-run wizard."
+commands.allow = ["first_run_close_wizard"]
+
+[[permission]]
+identifier = "allow-window-minimize"
+description = "Enables minimizing the current window."
+commands.allow = ["window_minimize"]
+
+[[permission]]
+identifier = "allow-window-toggle-maximize"
+description = "Enables maximizing or restoring the current window."
+commands.allow = ["window_toggle_maximize"]
+
+[[permission]]
+identifier = "allow-first-run-check-notion-user"
+description = "Enables first-run Notion user validation."
+commands.allow = ["first_run_check_notion_user"]
+
+[[permission]]
+identifier = "allow-first-run-check-notion-database"
+description = "Enables first-run Notion database validation."
+commands.allow = ["first_run_check_notion_database"]
+
+[[permission]]
+identifier = "allow-first-run-check-deepseek"
+description = "Enables first-run DeepSeek API key validation."
+commands.allow = ["first_run_check_deepseek"]

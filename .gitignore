@@ -1,0 +1,57 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node / Build
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# Rust
+/src-tauri/target/
+/src-tauri/Cargo.lock.bak
+
+# Environment / Secrets
+.git_old_leaked/
+.env
+.env.local
+.env.*.local
+*.local
+*.token
+config/secrets.json
+
+# SQLite local DB
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# IDE / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Resources & design kept local
+ichanDesign/
+validation/
+assets/
+
+# Binary artifacts
+*.exe
+
+# Legacy root files (not tracked)
+StateMachine.ts
+effects.css
