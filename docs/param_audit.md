@@ -58,6 +58,17 @@
 | `HUNGRY_COPY.enterCooldownMs` | `21600000` (6 h) | 饥饿提示最小间隔 | 
 | `CSV_FEED_TOAST_MS` | `2400` ms | CSV 投喂 toast 显示时长（`src/hooks/useDragDropFeed.ts`） |
 
+### 2.4 提醒调度参数（B2-6）
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `reminder.pollIntervalMs` | `1800000` (30 min) | Notion timed todo 轮询周期 |
+| `reminder.evaluateIntervalMs` | `60000` (60 s) | 到点检测周期 |
+| `reminder.maxQueueSize` | `3` | 内存队列上限 |
+| `reminder.dialogGateRetryMs` | `500` ms | dialog 活跃重试间隔 |
+| `reminder.dialogGateMaxRetries` | `60` | dialog 活跃最大重试次数（约 30s） |
+| `reminder.bubbleTitleMaxChars` | `20` | ReminderBubble 标题截断长度 |
+
 ---
 
 ## 3. 对话 / UI 布局参数

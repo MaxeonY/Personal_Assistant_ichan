@@ -1,6 +1,6 @@
 ﻿# Behavior_Config
 
-> **版本**: v1.3 - 2026-04-28（审计+落地对齐修订）
+> **版本**: v1.4 - 2026-04-30（B2-6 待办提醒参数入表）
 
 > 文档定位：本文件为 `src/config/petBehaviorConfig.ts` 的参数说明文档。
 > 职责：解释参数分组、参数语义、当前冻结基线、后续调参边界。
@@ -74,14 +74,25 @@
 
 补充说明（Bubble / Dialog）：
 
-- 当前配置中尚未建立 bubble 独立参数组，涉及 bubble 偏移时应优先新增/调整 config 项，不建议散落在 CSS 常量中硬改。
+- ReminderBubble 标题截断上限由 `reminder.bubbleTitleMaxChars` 控制；涉及提醒调度频率与重试策略时，统一在 `reminder` 参数组调整。
 - B1-10 对话 UI 的布局、动画、尺寸参数已在 `src/components/Dialog/dialog-tokens.ts` 中定义，包括：
   - `DIALOG_BOX_WIDTH`（560px）/ `DIALOG_BOX_HEIGHT`（360px）
   - `DIALOG_TRANSITION.openingMs`（320ms）对话打开动画
   - `DIALOG_PET_DISPLAY_HEIGHT`（136px）对话场景宠物显示高度
 - 后续若需调参，应优先修改 `dialog-tokens.ts` 并同步回流本文档。
 
-### 2.7 Hungry 判定参数
+### 2.7 Reminder Scheduler 参数
+
+| 参数名 | 含义 | 当前冻结值 | 推荐调节范围 | 调参风险提示 |
+|---|---|---:|---:|---|
+| `reminder.pollIntervalMs` | Notion timed todo 轮询周期 | `1800000 ms` | `600000 ~ 3600000 ms` | 过小会增加 Notion 访问频率；过大提醒到达延迟更明显。 |
+| `reminder.evaluateIntervalMs` | 本地队列到点检测周期 | `60000 ms` | `30000 ~ 120000 ms` | 过小会增加调度开销；过大可能导致提醒触发滞后。 |
+| `reminder.maxQueueSize` | 内存提醒队列上限 | `3` | `1 ~ 5` | 过小会丢失密集提醒；过大可能造成连续提醒侵扰。 |
+| `reminder.dialogGateRetryMs` | talking/dialog 活跃时重试间隔 | `500 ms` | `300 ~ 1000 ms` | 过小会造成无效轮询，过大延迟恢复提醒。 |
+| `reminder.dialogGateMaxRetries` | dialog gate 最大重试次数 | `60` | `20 ~ 120` | 与 `dialogGateRetryMs` 联动决定最大等待时长。 |
+| `reminder.bubbleTitleMaxChars` | 提醒气泡标题截断长度 | `20` | `12 ~ 30` | 过短影响可读性，过长易挤压气泡布局。 |
+
+### 2.8 Hungry 判定参数
 
 | 参数名 | 含义 | 当前冻结值 | 推荐调节范围 | 调参风险提示 |
 |---|---|---|---|---|

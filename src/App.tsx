@@ -32,7 +32,9 @@ import {
   isCompactDialogGeometryValid,
 } from "./components/Dialog/dialog-transition";
 import PetCanvas from "./components/Pet/PetCanvas";
+import ReminderBubble from "./components/Reminder/ReminderBubble";
 import type {
+  Coord,
   DialogOpenSource,
   PetEvent,
   PetFullState,
@@ -44,6 +46,11 @@ import { useDragDropFeed } from "./hooks/useDragDropFeed";
 import { routePhysicalEventToDialogOpen } from "./integration/dialogRouter";
 import { watchTalkingExitForDialogSync } from "./integration/dialogStateBridge";
 import { decideHungry } from "./services/HungryDecisionService";
+import {
+  ReminderScheduler,
+  type ReminderSchedulerSnapshot,
+} from "./services/ReminderScheduler";
+import { notionService } from "./services/notion-service";
 import { PetContextService } from "./services/PetContextService";
 import { PetStateMachine } from "./state/StateMachine";
 import type { TimerBackend } from "./state/timers";
@@ -54,6 +61,10 @@ import {
   logDialogDebug,
   replayDialogDebugLogsFromStorage,
 } from "./utils/dialogDebugLogger";
+import {
+  resolveReminderTarget,
+  type WorkareaBounds,
+} from "./utils/windowTargetResolver";
 import "./App.css";
 
 const IS_DEV_BUILD = import.meta.env.DEV;
@@ -165,6 +176,17 @@ function formatLocalDate(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function getLocalDateKey(date = new Date()): string {
+  return formatLocalDate(date);
+}
+
+function getLocalHHmmOneMinuteAgo(now = new Date()): string {
+  const next = new Date(now.getTime() - 60 * 1000);
+  const hours = String(next.getHours()).padStart(2, "0");
+  const minutes = String(next.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
 }
 
 function resolveDevTimerName(timeoutMs: number): DevTimerName {
@@ -345,11 +367,14 @@ function App() {
   const dialogCloseReasonRef = useRef<DialogCloseReason>("user");
   const ignorePatUntilMsRef = useRef(0);
   const dialogMovementResumeAtMsRef = useRef(0);
+  const schedulerRef = useRef<ReminderScheduler | null>(null);
 
   const [isClickThrough, setIsClickThrough] = useState(false);
   const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [devSnapshot, setDevSnapshot] = useState<StateMachineSnapshot | null>(null);
+  const [uiPetState, setUiPetState] = useState<PetFullState | null>(null);
+  const [schedulerSnapshot, setSchedulerSnapshot] = useState<ReminderSchedulerSnapshot | null>(null);
   const [devPanelNowMs, setDevPanelNowMs] = useState(() => nowMs());
   const [devHungryInfo, setDevHungryInfo] = useState<{
     lastCsvImportDate: string | null;
@@ -565,6 +590,38 @@ function App() {
       runtime.isRefreshingBounds = false;
     }
   }, [queueWindowPosition]);
+
+  const getWorkareaBounds = useCallback(async (): Promise<WorkareaBounds | null> => {
+    try {
+      const [monitor, outerPosition, outerSize] = await Promise.all([
+        currentMonitor(),
+        appWindow.outerPosition(),
+        appWindow.outerSize(),
+      ]);
+      if (!monitor) {
+        return null;
+      }
+
+      const workArea = monitor.workArea;
+      const rawMinX = workArea.position.x + WINDOW_EDGE_PADDING_PX;
+      const rawMaxX = workArea.position.x + workArea.size.width - outerSize.width - WINDOW_EDGE_PADDING_PX;
+      const rawMinY = workArea.position.y + WINDOW_EDGE_PADDING_PX;
+      const rawMaxY = workArea.position.y + workArea.size.height - outerSize.height - WINDOW_EDGE_PADDING_PX;
+      const minX = Math.min(rawMinX, rawMaxX);
+      const maxX = Math.max(rawMinX, rawMaxX);
+      const minY = Math.min(rawMinY, rawMaxY);
+      const maxY = Math.max(rawMinY, rawMaxY);
+
+      return {
+        minX,
+        maxX,
+        posY: clamp(outerPosition.y, minY, maxY),
+      };
+    } catch (error) {
+      console.error("[reminder] failed to resolve workarea bounds:", error);
+      return null;
+    }
+  }, [appWindow]);
 
   const stopWindowMovementLoop = useCallback(() => {
     if (movementTickTimerRef.current !== null) {
@@ -1078,6 +1135,7 @@ function App() {
 
       machineUnsubscribeRef.current?.();
       machineUnsubscribeRef.current = machine.subscribe((nextState, snapshot) => {
+        setUiPetState(nextState);
         if (pendingDialogUiOpenRef.current || nextState.major === "talking") {
           logDialogDebug("machine.subscribe.tick", {
             pendingDialogUiOpen: pendingDialogUiOpenRef.current,
@@ -1148,6 +1206,7 @@ function App() {
       if (IS_DEV_BUILD) {
         setDevSnapshot(machine.getSnapshot());
       }
+      setUiPetState(machine.getSnapshot().state);
       if (petBehaviorConfig.hungry.evaluateOnStartup) {
         void (async () => {
           try {
@@ -1184,8 +1243,39 @@ function App() {
       machineReadyRef.current = true;
       pendingExitRef.current = false;
       allowWindowCloseRef.current = false;
+
+      void (async () => {
+        if (schedulerRef.current) {
+          return;
+        }
+
+        try {
+          const [setupCompleted, token, dbId] = await Promise.all([
+            invoke<string | null>("config_get_value", { key: "setup_completed" }),
+            invoke<string | null>("config_get_value", { key: "notionToken" }),
+            invoke<string | null>("config_get_value", { key: "todoDbId" }),
+          ]);
+
+          if (setupCompleted !== "1" || !token || !dbId) {
+            return;
+          }
+
+          schedulerRef.current = new ReminderScheduler({
+            notionService,
+            todoDbId: dbId,
+            dispatch,
+            resolveTarget: resolveReminderTarget,
+            getWorkareaBounds,
+            getIsDialogActive: () => dialogModeActiveRef.current,
+            onSnapshot: setSchedulerSnapshot,
+          });
+          schedulerRef.current.start();
+        } catch (error) {
+          console.error("[reminder] scheduler bootstrap failed:", error);
+        }
+      })();
     },
-    [requestDialogClose, requestDialogOpen, syncWindowMovementFromState],
+    [dispatch, getWorkareaBounds, requestDialogClose, requestDialogOpen, syncWindowMovementFromState],
   );
 
   const handlePatClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
@@ -1335,22 +1425,6 @@ function App() {
     hitboxPointerGestureRef.current = createInitialHitboxPointerGesture();
   }, []);
 
-  const resolveDevReminderTarget = useCallback(() => {
-    const runtime = movementRuntimeRef.current;
-    const span = runtime.maxX - runtime.minX;
-    if (Number.isFinite(span) && span > 0) {
-      return {
-        x: runtime.minX + span * TARGETED_DEFAULT_WORKAREA_X,
-        y: runtime.posY,
-      };
-    }
-
-    return {
-      x: TARGETED_DEFAULT_WORKAREA_X,
-      y: 0,
-    };
-  }, []);
-
   const handleDevForceDrowsy = useCallback(() => {
     dispatch({ type: "idle.timeout" });
   }, [dispatch]);
@@ -1376,8 +1450,8 @@ function App() {
       dispatch({ type: "idle.timeout" });
       dispatch({ type: "timer.drowsyToNap" });
     }
-    dispatch({ type: "reminder.due", target: resolveDevReminderTarget() });
-  }, [dispatch, resolveDevReminderTarget]);
+    dispatch({ type: "reminder.due", target: resolveReminderTarget(null) });
+  }, [dispatch]);
 
   const handleDevForceDialogOpen = useCallback(() => {
     logDialogDebug("dev.forceDialogOpen.click");
@@ -1449,9 +1523,41 @@ function App() {
     dispatch({ type: "user.feed", csv });
   }, [dispatch]);
 
-  const handleDevInjectReminderDue = useCallback(() => {
-    dispatch({ type: "reminder.due", target: resolveDevReminderTarget() });
-  }, [dispatch, resolveDevReminderTarget]);
+  type ReminderDevAction =
+    | { type: "reminder.due.raw"; target: Coord }
+    | { type: "notionTimedTodo.simulate"; todo: { id: string; title: string; reminderTime: string } };
+
+  const handleReminderDevAction = useCallback((payload: ReminderDevAction): void => {
+    if (payload.type === "reminder.due.raw") {
+      dispatch({ type: "reminder.due", target: payload.target });
+      return;
+    }
+
+    if (payload.type === "notionTimedTodo.simulate") {
+      schedulerRef.current?.devSimulate(payload.todo);
+      return;
+    }
+
+    console.warn("[reminder.dev] unknown payload type:", (payload as { type: unknown }).type);
+  }, [dispatch]);
+
+  const handleDevForceReminderDueRaw = useCallback(() => {
+    handleReminderDevAction({
+      type: "reminder.due.raw",
+      target: resolveReminderTarget(null),
+    });
+  }, [handleReminderDevAction]);
+
+  const handleDevSimulateNotionTimedTodo = useCallback(() => {
+    handleReminderDevAction({
+      type: "notionTimedTodo.simulate",
+      todo: {
+      id: `dev-reminder-${getLocalDateKey()}`,
+      title: "DEV 模拟待办提醒",
+      reminderTime: getLocalHHmmOneMinuteAgo(),
+      },
+    });
+  }, [handleReminderDevAction]);
 
   const handleDevInjectExit = useCallback(() => {
     dispatch({ type: "user.exit" });
@@ -1542,6 +1648,16 @@ function App() {
   const handleDevCloseDialog = useCallback(() => {
     requestDialogClose({ reason: "user", dispatchStateEvent: true, source: "user" });
   }, [requestDialogClose]);
+
+  const handleReminderDismiss = useCallback((event?: ReactMouseEvent<HTMLButtonElement>) => {
+    event?.stopPropagation();
+    schedulerRef.current?.dismiss("bubble");
+  }, []);
+
+  const shouldShowReminderBubble = schedulerRef.current !== null
+    && schedulerSnapshot?.activeReminder !== null
+    && uiPetState?.major === "reminding"
+    && uiPetState?.movement.state === "still";
 
   useEffect(() => {
     let disposed = false;
@@ -1792,6 +1908,9 @@ function App() {
       machineUnsubscribeRef.current = null;
       dialogBridgeUnsubscribeRef.current?.();
       dialogBridgeUnsubscribeRef.current = null;
+      schedulerRef.current?.destroy();
+      schedulerRef.current = null;
+      setSchedulerSnapshot(null);
       machineRef.current.destroy();
       machineReadyRef.current = false;
       isDevPanelOpenRef.current = false;
@@ -1799,6 +1918,7 @@ function App() {
       devDockBaseSizeRef.current = null;
       devDockResizeInFlightRef.current = false;
       dialogModeActiveRef.current = false;
+      setUiPetState(null);
       dialogOpenedFromRef.current = null;
       dialogTransitionSessionRef.current = null;
       dialogTransitionPhaseRef.current = "compact";
@@ -1843,6 +1963,13 @@ function App() {
           onReady={handlePlayerReady}
         />
         {status ? <div className="pet-status">{status}</div> : null}
+        {shouldShowReminderBubble && schedulerSnapshot?.activeReminder ? (
+          <ReminderBubble
+            reminder={schedulerSnapshot.activeReminder}
+            titleMaxChars={petBehaviorConfig.reminder.bubbleTitleMaxChars}
+            onDismiss={handleReminderDismiss}
+          />
+        ) : null}
       </div>
       {IS_DEV_BUILD && DevPanelLazy ? (
         <Suspense fallback={null}>
@@ -1858,6 +1985,7 @@ function App() {
             hungryThresholdDays={petBehaviorConfig.hungry.thresholdDays}
             hungryIsHungry={devSnapshot?.state.flags.isHungry ?? false}
             hungryDaysSinceFeed={devHungryInfo?.daysSinceFeed ?? 0}
+            schedulerSnapshot={schedulerSnapshot}
             timerItems={devTimerItems}
             onClose={() => setDevPanelOpenState(false)}
             onForceDrowsy={handleDevForceDrowsy}
@@ -1871,7 +1999,8 @@ function App() {
             onResetIdleAwake={handleDevResetIdleAwake}
             onInjectPat={handleDevInjectPat}
             onInjectFeed={handleDevInjectFeed}
-            onInjectReminderDue={handleDevInjectReminderDue}
+            onForceReminderDueRaw={handleDevForceReminderDueRaw}
+            onSimulateNotionTimedTodo={handleDevSimulateNotionTimedTodo}
             onInjectExit={handleDevInjectExit}
             onInjectMovementArrive={handleDevInjectMovementArrive}
             onToggleHungry={handleDevToggleHungry}

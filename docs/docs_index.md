@@ -1,6 +1,6 @@
 ﻿# docs_index
 
-> **版本**: v2.0 - 2026-04-27（docs 目录结构化归拢）  
+> **版本**: v2.1 - 2026-04-30（同步 B2-6 文档携带口径）  
 > 目的：统一回答"去哪找什么"，并给出 Phase B 任务的最小文档携带口径。
 
 ---
@@ -32,7 +32,7 @@ docs/
 │
 ├── 04_task_cards/                               # 任务卡
 │   ├── active/                                  # 当前进行中的任务卡
-│   │   └── B2-13_task_card_v1.2.md              # chat 历史 FTS5 关键词记忆库（进行中）
+│   │   └── B2-6_task_card_v1.2.md               # 待办提醒功能（进行中）
 │   ├── done/                                    # 已完成任务卡
 │   │   └── B1-7_task_card_v1.1.md               # 首启向导任务卡（已完成）
 │   └── templates/                               # 任务卡模板
@@ -89,6 +89,7 @@ docs/
 | 验证策略 / harness | 默认集 | `01_contracts/phaseb_valstrategyrepo.md` |
 | 首启向导 UI | 默认集 | `02_ui_schema/first_run_wizard_schema.md` |
 | 对话静态 UI / 气泡 / 输入区 / 交互规则 | 默认集 | `02_ui_schema/talking_interaction_schema.md` |
+| 待办提醒 / ReminderBubble | 默认集 | `01_contracts/behavior_config.md` + `readme_devpanel.md` |
 | 对话打开/关闭动效 / anchor / phase / transition | 默认集 | `02_ui_schema/dialog_transition_schema.md` |
 | DEV 面板观测/注入 | `ichan_project_doc.md` + `readme_devpanel.md` | 触及契约时加 `01_contracts/interface_v1_2.md` |
 | 历史追溯 | 默认集 | `04_task_cards/done/*` 或 `99_archive/*` |
@@ -192,14 +193,16 @@ templates/ ──创建──▶ active/ ──完成──▶ done/
 
 ---
 
-## 9. B2-9 文档同步（2026-04-29）
+## 9. Batch 2 文档同步（2026-04-30）
 
-- 本轮实现任务卡：`active/B2-9_task_card_v1.2.md`
-- 完成归档目标：`done/B2-9_task_card_v1.2.md`
+- 本轮进行中任务卡：`active/B2-6_task_card_v1.2.md`
+- 已完成归档任务卡：`done/B2-9_task_card_v1.2.md`
 - 相关回流文档：
-  - `01_contracts/interface_v1_2.md`（v1.3）
-  - `02_ui_schema/talking_interaction_schema.md`
-  - `03_execution/phaseb_execution_plan.md`（新增 5.13）
-  - `readme_devpanel.md`
+  - `01_contracts/behavior_config.md`（v1.4）
+  - `03_execution/phaseb_execution_plan.md`（新增 5.14）
+  - `readme_devpanel.md`（v1.3）
   - `param_audit.md`
   - `ichan_project_doc.md`
+  - `docs_index.md`
+  - `01_contracts/interface_v1_2.md`（v1.3）
+  - `02_ui_schema/talking_interaction_schema.md`

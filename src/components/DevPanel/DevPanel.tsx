@@ -1,4 +1,5 @@
 import type { PetFullState, StateMachineSnapshot } from "../Pet/types";
+import type { ReminderSchedulerSnapshot } from "../../services/ReminderScheduler";
 import type { CSSProperties } from "react";
 import "./dev-panel.css";
 
@@ -21,6 +22,7 @@ export interface DevPanelProps {
   hungryThresholdDays: number;
   hungryIsHungry: boolean;
   hungryDaysSinceFeed: number;
+  schedulerSnapshot: ReminderSchedulerSnapshot | null;
   timerItems: readonly DevPanelTimerItem[];
   onClose: () => void;
   onForceDrowsy: () => void;
@@ -34,7 +36,8 @@ export interface DevPanelProps {
   onResetIdleAwake: () => void;
   onInjectPat: () => void;
   onInjectFeed: () => void;
-  onInjectReminderDue: () => void;
+  onForceReminderDueRaw: () => void;
+  onSimulateNotionTimedTodo: () => void;
   onInjectExit: () => void;
   onInjectMovementArrive: () => void;
   onToggleHungry: () => void;
@@ -67,6 +70,7 @@ export default function DevPanel({
   hungryThresholdDays,
   hungryIsHungry,
   hungryDaysSinceFeed,
+  schedulerSnapshot,
   timerItems,
   onClose,
   onForceDrowsy,
@@ -80,7 +84,8 @@ export default function DevPanel({
   onResetIdleAwake,
   onInjectPat,
   onInjectFeed,
-  onInjectReminderDue,
+  onForceReminderDueRaw,
+  onSimulateNotionTimedTodo,
   onInjectExit,
   onInjectMovementArrive,
   onToggleHungry,
@@ -141,7 +146,12 @@ export default function DevPanel({
           <div className="dev-panel__actions">
             <button className="dev-panel__button" onClick={onInjectPat} type="button">user.pat</button>
             <button className="dev-panel__button" onClick={onInjectFeed} type="button">user.feed</button>
-            <button className="dev-panel__button" onClick={onInjectReminderDue} type="button">reminder.due</button>
+            <button className="dev-panel__button" onClick={onForceReminderDueRaw} type="button">
+              Force reminder.due (raw)
+            </button>
+            <button className="dev-panel__button" onClick={onSimulateNotionTimedTodo} type="button">
+              Simulate Notion timed todo
+            </button>
             <button className="dev-panel__button" onClick={onInjectExit} type="button">user.exit</button>
             <button
               className="dev-panel__button"
@@ -224,6 +234,26 @@ export default function DevPanel({
                   daysSinceFeed: hungryDaysSinceFeed === Number.POSITIVE_INFINITY
                     ? "Infinity"
                     : hungryDaysSinceFeed,
+                })}
+              </pre>
+            </article>
+            <article className="dev-panel__state-card">
+              <h4 className="dev-panel__state-title">Scheduler</h4>
+              <pre className="dev-panel__state">
+                {toPrettyJson({
+                  status: schedulerSnapshot?.status ?? null,
+                  queueSize: schedulerSnapshot?.queueSize ?? 0,
+                  activeReminder: schedulerSnapshot?.activeReminder
+                    ? {
+                      id: schedulerSnapshot.activeReminder.id,
+                      title: schedulerSnapshot.activeReminder.title,
+                      reminderTime: schedulerSnapshot.activeReminder.reminderTime,
+                    }
+                    : null,
+                  dismissedTodayCount: schedulerSnapshot?.dismissedTodayCount ?? 0,
+                  dialogGateRetryCount: schedulerSnapshot?.dialogGateRetryCount ?? 0,
+                  lastPollError: schedulerSnapshot?.lastPollError ?? null,
+                  lastPollAt: schedulerSnapshot?.lastPollAt ?? null,
                 })}
               </pre>
             </article>

@@ -38,6 +38,14 @@ export const petBehaviorConfig = {
     thresholdDays: 3,
     evaluateOnStartup: true,
   },
+  reminder: {
+    pollIntervalMs: 30 * 60 * 1000,
+    evaluateIntervalMs: 60 * 1000,
+    maxQueueSize: 3,
+    dialogGateRetryMs: 500,
+    dialogGateMaxRetries: 60,
+    bubbleTitleMaxChars: 20,
+  },
   ui: {
     petDisplayHeightPx: 180,//宠物显示盒的统一显示高度，体感大小、命中区域&窗口视觉占比
   },
