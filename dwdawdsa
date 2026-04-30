@@ -1,0 +1,9 @@
+[33ma189f6f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeat/B2-6[m[33m, [m[1;32mmain[m[33m)[m chore: docs change
+[33m684631b[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mfeat/B2-9-c5-test-docs[m[33m)[m feat(B2-9,B1-4): stabilize dialog flow and fix DeepSeek fetch binding
+[33m130d5dd[m test/docs: add tests and close documentation loop
+[33me159f7e[m feat: add B2-9 DevPanel force buttons
+[33m359c3ee[m feat: wire dialog close path and one-way bridge
+[33m5ca31cd[m feat: add dialogRouter and wire open path
+[33m4af6abb[m feat: implement dialog open/close in StateMachine
+[33mf13a358[m feat: upgrade dialog PetEvent contract
+[33m65bcf83[m[33m ([m[1;32mfeat/B2-9[m[33m)[m initial clean import

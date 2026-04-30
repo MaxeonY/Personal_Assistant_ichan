@@ -405,7 +405,7 @@ interface ChatMemoryStore {
   - hungry 自动判定可按阈值输出并驱动 `hungry.set`。
 
 #### 3.2.3 Batch 2：状态闭环 + 长期记忆增强
-- 范围：6,9(Done✅),13(Done✅)
+- 范围：6(In Progress),9(Done✅),13(Done✅)
 - 目标：聚焦提醒闭环、talking 正常退出闭环；并落地 chat 历史 FTS5 召回。
 - 输入：Batch 0/1 产出。
 - DoD：
@@ -1331,3 +1331,40 @@ Tauri 侧在 `src-tauri/src/lib.rs` 注册上述命令，并在 `src-tauri/permi
 - 文档治理结论：
   - 以 `B2-9_task_card_v1.2.md` + `B2-9_implementation_details_v0.2.md` + `B2-9_architecture_v0.3_patch.md` 作为有效口径；
   - `B2-9_architecture_v0.2.md` 与 `B2-9_implementation_details_v0.1.md` 仅保留历史参考，避免继续用于验收判定。
+
+### 5.14 B2-6
+
+执行范围与对应任务
+
+- 执行批次：Batch 2
+- 对应任务：任务6（待办提醒功能）
+- 当前状态：待验收（2026-04-30）
+
+#### 5.14.1 实施摘要
+
+- 新增 `ReminderScheduler`，覆盖 poll/enqueue/evaluate/dialog gate/dismiss/day change 主链路。
+- 在 `App.tsx` 完成 scheduler 生命周期接线，启动后立即首发 poll，卸载时销毁全部 timer。
+- 新增 `ReminderBubble`，仅在 `major='reminding' && movement='still'` 显示，点击 `×` 走 `scheduler.dismiss('bubble')`。
+- DevPanel reminder 注入拆分为 raw / simulate 双路径，并增加 scheduler snapshot 观测卡。
+- 抽出 `windowTargetResolver`，统一 reminder 目标点解析策略。
+
+#### 5.14.2 改动清单
+
+- `src/services/ReminderScheduler.ts`
+- `src/services/ReminderScheduler.test.ts`
+- `src/utils/windowTargetResolver.ts`
+- `src/components/Reminder/ReminderBubble.tsx`
+- `src/components/Reminder/ReminderBubble.css`
+- `src/App.tsx`
+- `src/components/DevPanel/DevPanel.tsx`
+- `src/config/petBehaviorConfig.ts`
+
+#### 5.14.3 测试执行与结果
+
+- `pnpm exec tsc --noEmit`：通过
+- `pnpm test -- ReminderScheduler`：通过（提权环境，规避沙箱 `spawn EPERM`）
+
+#### 5.14.4 待补充验收
+
+- `pnpm tauri dev`：需在本地 GUI 会话完成主路径与 dialog gate 手测。
+- `pnpm tauri build --debug`：本轮未执行。

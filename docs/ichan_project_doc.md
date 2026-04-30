@@ -1081,6 +1081,7 @@ Gemini 写的代码由 GPT 审核。Grok 写的任何东西都由 GPT 审核。
 | 6 | ~~Notion 数据库具体字段与 ID 对接~~ | 内容已确定✅ | 项目负责人提供 + GPT/Codex 落地 |
 | 7 | ~~DeepSeek i酱人格 Prompt 精调~~ | 方案已确定✅ | Claude + 项目负责人 |
 | 8 | 优化对话气泡 | ⏳ 后续评估（MVP 后） | 项目负责人 |
+| 9 | 将工作流转换至本地Git项目 | ⏳ 后续评估（MVP 后） | 项目负责人 |
 
 ---
 
@@ -1091,18 +1092,19 @@ Gemini 写的代码由 GPT 审核。Grok 写的任何东西都由 GPT 审核。
 ### 9.1 📋 待开始 (Backlog)
 
 - Phase B：业务能力接入
-  - [ ] Batch 2 阶段业务（B2-6提醒、B2-9 talking退出），详见`phaseb_execution_plan.md`文档`3.2.3`小节
+  - [ ] Batch 2 阶段业务（B2-6 提醒链路最终验收），详见`phaseb_execution_plan.md`文档`3.2.3`小节
   - [ ] Batch 3 阶段业务（B3-5晨间仪式），详见`phaseb_execution_plan.md`文档`3.2.4`小节
   - [ ] Phase B 接入 DeepSeek 时闭合 talking 正常退出机制（`dialog.close` 事件或 talking `exit` intent）
+  - [ ] 修复B1-10 对话框上下滑动查看历史对话时消失的问题
 
 ### 9.2 🚧 进行中 (In Progress)
 
-- PhaseB Batch 2 收口阶段（B2-6 / B2-9）
+- PhaseB Batch 2 收口阶段（B2-6）
 
 ### 9.3 ✅ 已完成 (Done)
 
 - [x] Phase A 功能闭环完成（播放器 + 状态机 + 链路验证）
-- [x] hungry 语义收口：逻辑层为 overlay/flag，表现层为独立 overlay 素材层
+- [x] hungry 语义收口：逻辑层为 overlay/flag，表现层为独立 overlays 素材层
 - [x] roaming / targeted_move 真实位移落地，`movement.arrive` + `requestId` 防陈旧闭环
 - [x] DevPanel 落地（仅 DEV 挂载，作为 PhaseA.5 on-desktop observation tool）
 - [x] 参数体系冻结 / 体验冻结（PhaseA.5 收口）

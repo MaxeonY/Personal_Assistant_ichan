@@ -1,0 +1,57 @@
+.reminder-bubble {
+  position: absolute;
+  left: 50%;
+  top: 68px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 196px;
+  max-width: 312px;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 12px;
+  transform: translateX(-50%);
+  background: linear-gradient(170deg, rgba(22, 26, 36, 0.94), rgba(15, 18, 25, 0.92));
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+  color: #f8fbff;
+  z-index: 9;
+}
+
+.reminder-bubble__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.reminder-bubble__title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reminder-bubble__subtitle {
+  margin-top: 4px;
+  opacity: 0.88;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.reminder-bubble__close {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #f8fbff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reminder-bubble__close:hover {
+  background: rgba(255, 255, 255, 0.24);
+}

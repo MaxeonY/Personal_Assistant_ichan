@@ -1,6 +1,6 @@
 # README: Dev Overlay Panel (PhaseA.5+)
 
-> **版本**: v1.2 - 2026-04-27（审计+落地对齐修订，补录 B1-10 新增能力）
+> **版本**: v1.3 - 2026-04-30（补录 B2-6 reminder 双路径注入与 scheduler 观测）
 
 ## 1. How To Open
 
@@ -24,7 +24,8 @@ All of these use existing state machine entries (`dispatch(...)` or `start(...)`
 
 - `user.pat`
 - `user.feed` (injects a minimal dummy CSV `File`)
-- `reminder.due`
+- `Force reminder.due (raw)`：直接 `dispatch({ type: 'reminder.due', target })`，不经过 scheduler
+- `Simulate Notion timed todo`：调用 `scheduler.devSimulate(todo)`，走 queue/evaluate/dialog gate/dismiss 去重全路径
 - `user.exit`
 - `movement.arrive` (auto-uses current `movement.requestId`; disabled if none)
 
@@ -45,6 +46,7 @@ All of these use existing state machine entries (`dispatch(...)` or `start(...)`
 - `Playback` (`currentAnimationToken`, `queuedEventCount`)
 - `Movement` (including `requestId`)
 - `Timers` (DEV timer-backend mirror with remaining time)
+- `Scheduler` (`status` / `queueSize` / `activeReminder` / `dismissedTodayCount` / `dialogGateRetryCount` / `lastPollError` / `lastPollAt`)
 
 ## 3. Hard Constraints
 
@@ -67,4 +69,9 @@ All of these use existing state machine entries (`dispatch(...)` or `start(...)`
 - `Force dialog.close`: 仅 `dispatch({ type: 'dialog.close', reason: 'user' })`；若 UI 仍打开，由 `dialogStateBridge` 单向兜底关闭。
 - `Force dialog.open from drowsy`: 依次派发 `idle.timeout` -> `dialog.open`，用于验证 drowsy_exit 串行到 talking。
 - `Force dialog.open from napping`: 依次派发 `idle.timeout` -> `timer.drowsyToNap` -> `dialog.open`，用于验证 wake.from_nap 串行到 talking。
+
+## 6. B2-6 Reminder 注入分流（2026-04-30）
+
+- raw 路径：用于快速触发 `targeted_move -> reminding`，不落 scheduler 状态，不增加 `dismissedTodayCount`。
+- simulate 路径：用于验证 scheduler 行为（队列上限、dialog gate、dismissed 去重、day change 复位）。
 
