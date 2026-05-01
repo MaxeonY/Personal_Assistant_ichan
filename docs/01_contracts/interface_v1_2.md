@@ -1,6 +1,6 @@
 # ICHAN Phase A 接口定稿 v1.3
 
-**文件路径**: `docs/interface_v1_2.md`
+**文件路径**: `docs/01_contracts/interface_v1_2.md`
 **范围**: Phase A 任务 2（动画播放器） / 任务 3（三层状态机最小可运行版）
 **状态**: 审定版（2026-04-27 审计对齐复核）
 **审定**: Claude（架构）| 起草 GPT（基于 Claude 给定骨架扩展）

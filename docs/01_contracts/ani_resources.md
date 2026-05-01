@@ -18,6 +18,7 @@
 ## 1.统计
 
 - 子目录数量：18
+    - 备注：按unique 路径计算
 - 图片总数：116
 
 ## 2.全局资源规格
@@ -577,6 +578,8 @@
 | `walk_targeted_right_01.png` | 251 | 254 | `assets/walk/targeted/walk_targeted_right_01.png` |
 | `walk_targeted_right_02.png` | 254 | 255 | `assets/walk/targeted/walk_targeted_right_02.png` |
 | `walk_targeted_right_03.png` | 265 | 267 | `assets/walk/targeted/walk_targeted_right_03.png` |
+
+- 备注：此为打包前尺寸，附录 A 与实际运行时尺寸不反映打包后状态
 
 
 ## 附录B：更新日志

@@ -32,13 +32,13 @@ docs/
 │
 ├── 04_task_cards/                               # 任务卡
 │   ├── active/                                  # 当前进行中的任务卡
-│   │   └── B2-6_task_card_v1.2.md               # 待办提醒功能（进行中）
+│   │   └── B2-6_task_card_v1.2.md               # 待办提醒功能（进行中）（仅为示例，实际该文件夹内包含多个文档）
 │   ├── done/                                    # 已完成任务卡
 │   │   └── B1-7_task_card_v1.1.md               # 首启向导任务卡（已完成）
 │   └── templates/                               # 任务卡模板
 │
 ├── 05_audit/                                    # 审计基线
-│   └── project_audit_report_2026-04-27.md       # 最新审计报告（唯一当前基线）
+│   
 │
 ├── 06_fix_reports/                              # 修复报告归档
 │   └── fix_summary_first_run_wizard.md          # B1-7 修复报告（结论已回流）
@@ -166,7 +166,7 @@ templates/ ──创建──▶ active/ ──完成──▶ done/
 | UI Schema | `<主题>_schema.md` | `dialog_transition_schema.md` |
 | 执行计划 | `<阶段>_execution_plan.md` | `phaseb_execution_plan.md` |
 | 任务卡 | `B<batch>-<编号>_task_card_v<版本>.md` | `B1-7_task_card_v1.1.md` |
-| 审计报告 | `project_audit_report_<YYYY-MM-DD>.md` | `project_audit_report_2026-04-27.md` |
+| 审计报告 | `project_audit_report_<YYYY-MM-DD>.md` | - |
 | 修复报告 | `fix_summary_<主题>.md` | `fix_summary_first_run_wizard.md` |
 | 参数审计 | `param_audit.md` | `param_audit.md` |
 | 归档文档 | 保留原始文件名 | `engineering_lessons_phasea.md` |

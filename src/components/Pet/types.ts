@@ -29,7 +29,7 @@ export type OverlayIntent = 'enter' | 'loop' | 'exit';
 
 /**
  * 公共状态名。
- * 必须与 ICHAN DOC §4.4 + animation_resources.md §3 一致。
+ * 必须与 ICHAN DOC §4.4 + ani_resources.md §3 一致。
  */
 export type PetState =
   | 'idle.awake'

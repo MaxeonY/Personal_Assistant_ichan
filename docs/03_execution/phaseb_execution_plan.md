@@ -405,7 +405,7 @@ interface ChatMemoryStore {
   - hungry 自动判定可按阈值输出并驱动 `hungry.set`。
 
 #### 3.2.3 Batch 2：状态闭环 + 长期记忆增强
-- 范围：6(In Progress),9(Done✅),13(Done✅)
+- 范围：6(Done✅),9(Done✅),13(Done✅)
 - 目标：聚焦提醒闭环、talking 正常退出闭环；并落地 chat 历史 FTS5 召回。
 - 输入：Batch 0/1 产出。
 - DoD：
@@ -1368,3 +1368,4 @@ Tauri 侧在 `src-tauri/src/lib.rs` 注册上述命令，并在 `src-tauri/permi
 
 - `pnpm tauri dev`：需在本地 GUI 会话完成主路径与 dialog gate 手测。
 - `pnpm tauri build --debug`：本轮未执行。
+- 备注：验收通过
