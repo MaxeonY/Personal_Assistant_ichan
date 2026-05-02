@@ -68,6 +68,7 @@ function createMonotonicNow(): () => TimestampMs {
 export class PetStateMachine implements StateMachine {
   private player: AnimationPlayer | null = null;
   private now: () => TimestampMs = createMonotonicNow();
+  private onExitRequest: (() => void) | null = null;
   private readonly random: () => number;
   private readonly timerBackend: TimerBackend;
   private readonly timerConfig: StateMachineTimerConfig;
@@ -97,6 +98,7 @@ export class PetStateMachine implements StateMachine {
   public init(player: AnimationPlayer, options: StateMachineInitOptions = {}): void {
     this.player = player;
     this.now = options.now ?? createMonotonicNow();
+    this.onExitRequest = options.onExitRequest ?? null;
     this.destroyed = false;
   }
 
@@ -200,6 +202,10 @@ export class PetStateMachine implements StateMachine {
   }
 
   private handleEvent(event: PetEvent): void {
+    if (this.state.lifecycle === 'farewell') {
+      return;
+    }
+
     switch (event.type) {
       case 'morningRitual.complete':
         if (this.state.lifecycle === 'waking_up') {
@@ -779,6 +785,7 @@ export class PetStateMachine implements StateMachine {
           flags: { ...this.state.flags },
         });
         this.emitStateChanged();
+        this.onExitRequest?.();
       },
     });
 

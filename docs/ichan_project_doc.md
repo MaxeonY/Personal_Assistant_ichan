@@ -11,6 +11,7 @@
   > v0.4.9 - 2026-04-25;
   > v0.5.0 - 2026-04-27
   > v0.5.1 - 2026-04-27（审计+落地对齐修订）
+  > v0.5.2 - 2026-05-02（B3-14 退出链路落地与文档对齐）
 > **维护者**: Claude/GPT + 项目负责人MaxeonY
 > **用途**: 所有参与开发的 AI 共享此文档作为唯一上下文来源
 > 动画资源的实际帧名、帧序、循环方式，以 `ani_resources.md` 为唯一事实来源；
@@ -1087,14 +1088,10 @@ Gemini 写的代码由 GPT 审核。Grok 写的任何东西都由 GPT 审核。
 
 ## 9.当前任务看板
 
-当前阶段判断：**Phase A 已完成，Phase A.5 体验冻结已完成，项目进入 Phase B 业务能力接入阶段。**
+当前阶段判断：**Phase A 已完成，Phase A.5 体验冻结已完成，项目进入 Phase B 业务能力基本完成，剩余B3-5上层任务**
 
 ### 9.1 📋 待开始 (Backlog)
 
-- Phase B：业务能力接入
-  - [ ] Batch 2 阶段业务（B2-6 提醒链路最终验收），详见`phaseb_execution_plan.md`文档`3.2.3`小节
-  - [ ] Batch 3 阶段业务（B3-5晨间仪式），详见`phaseb_execution_plan.md`文档`3.2.4`小节
-  - [ ] Phase B 接入 DeepSeek 时闭合 talking 正常退出机制（`dialog.close` 事件或 talking `exit` intent）
   - [ ] 修复B1-10 对话框上下滑动查看历史对话时消失的问题
 
 ### 9.2 🚧 进行中 (In Progress)
@@ -1121,6 +1118,11 @@ Gemini 写的代码由 GPT 审核。Grok 写的任何东西都由 GPT 审核。
   - [x] B2-13 chat 历史 FTS5 关键词记忆库, Done. 实施报告见`docs/03_execution/phaseb_execution_plan.md`文档`5.12`小节
   - [x] B2-9 talking 正常退出机制闭合, Done. 实施报告见`docs/03_execution/phaseb_execution_plan.md`文档`5.13`小节
   - [x] B2-6 待办提醒, Done.实施报告见`docs/03_execution/phaseb_execution_plan.md`文档`5.14`小节
+  - [x] B2-6 待办提醒, Done.实施报告见`docs/03_execution/phaseb_execution_plan.md`文档`5.14`小节
+- [ ] PhaseB Batch3 业务实现，详见`docs/03_execution/phaseb_execution_plan.md`文档`3.2.4`小节及`5.15`-`5.16`小节
+  - [x] B3-14 退出机制与clean-Exit 持久化 , Done.实施报告见`docs/03_execution/phaseb_execution_plan.md`文档`5.15`小节
+
+- [ ] Phase B 接入 DeepSeek 时闭合 talking 正常退出机制（`dialog.close` 事件或 talking `exit` intent）
 
 ## 附录A 关键 API 参考
 

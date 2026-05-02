@@ -28,6 +28,7 @@
     "allow-first-run-close-wizard",
     "allow-window-minimize",
     "allow-window-toggle-maximize",
+    "allow-app-quit",
     "allow-first-run-check-notion-user",
     "allow-first-run-check-notion-database",
     "allow-first-run-check-deepseek",

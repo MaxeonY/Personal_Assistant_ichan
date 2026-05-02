@@ -1,18 +1,21 @@
-﻿import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
+import type { SessionBootstrap } from "../components/Pet/types";
 
 /**
- * PetContext 持久化通道（过渡方案）。
+ * PetContext persistence bridge.
  *
- * 当前使用 SQLite `config` 表（key-value 结构）存储 PetContext 字段。
- * 迁移触发条件（满足任一即启动迁移至独立 pet_context 表）：
- *   1. PetContext 字段数 >= 5 且跨领域使用（CSV/Notion/Chat）
- *   2. 单字段读写频率超过 1 次/分钟
- *   3. 需要事务性批量更新多个字段
- *
- * 详见任务卡 B1-12 §8.5。
+ * Current implementation stores PetContext fields in SQLite `config` key-value table.
  */
-
 const KEY_LAST_CSV_IMPORT = "petcontext.lastCsvImportDate";
+const KEY_LAST_EXIT_CLEAN = "petcontext.lastExitClean";
+const KEY_LAST_SEEN_DATE = "petcontext.lastSeenDate";
+
+function formatLocalDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 export const PetContextService = {
   async getLastCsvImportDate(): Promise<string | null> {
@@ -32,11 +35,74 @@ export const PetContextService = {
     });
   },
 
+  async getLastExitClean(): Promise<boolean | null> {
+    const raw = await invoke<string | null>("config_get_value", {
+      key: KEY_LAST_EXIT_CLEAN,
+    });
+    if (raw == null) {
+      return null;
+    }
+    return raw === "true";
+  },
+
+  async setLastExitClean(value: boolean): Promise<void> {
+    await invoke("config_set_value", {
+      key: KEY_LAST_EXIT_CLEAN,
+      value: String(value),
+    });
+  },
+
+  async getLastSeenDate(): Promise<string | null> {
+    return await invoke<string | null>("config_get_value", {
+      key: KEY_LAST_SEEN_DATE,
+    });
+  },
+
+  async setLastSeenDate(date: string): Promise<void> {
+    await invoke("config_set_value", {
+      key: KEY_LAST_SEEN_DATE,
+      value: date,
+    });
+  },
+
+  async loadSessionBootstrap(): Promise<SessionBootstrap> {
+    let lastExitClean = false;
+    let lastSeenDate: string | null = null;
+
+    try {
+      lastExitClean = (await this.getLastExitClean()) ?? false;
+      lastSeenDate = await this.getLastSeenDate();
+    } catch (error) {
+      console.error("[PetContext] loadSessionBootstrap read failed, defaulting to unclean:", error);
+      lastExitClean = false;
+      lastSeenDate = null;
+    }
+
+    const today = formatLocalDate(new Date());
+    const isNewDay = lastSeenDate !== today;
+
+    try {
+      await this.setLastExitClean(false);
+      await this.setLastSeenDate(today);
+    } catch (error) {
+      console.error(
+        "[PetContext] dirty-bit write failed; this session may be undetectable next launch:",
+        error,
+      );
+    }
+
+    return { isNewDay, lastExitClean };
+  },
+
+  async markCleanExit(): Promise<void> {
+    await this.setLastExitClean(true);
+  },
+
   /**
-   * 预留：从 config 表迁移至独立 pet_context 表。
-   * TODO(B1-12): 实现迁移逻辑，当触发任一迁移条件时调用。
+   * Reserved migration hook: move petcontext.* from config table to dedicated pet_context table.
    */
   async migrateFromConfigTable(): Promise<void> {
-    // Placeholder: 将 config 表中 petcontext.* 键迁移至独立表
+    // Placeholder: migrate `petcontext.*` keys from config table to dedicated table.
   },
 };
+

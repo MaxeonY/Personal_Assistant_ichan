@@ -74,11 +74,12 @@ const DevPanelLazy = IS_DEV_BUILD
 
 const {
   clickThroughShortcut: CLICK_THROUGH_SHORTCUT,
+  dialogShortcut: DIALOG_SHORTCUT,
+  devPanelShortcut: DEV_PANEL_SHORTCUT,
+  exitShortcut: EXIT_SHORTCUT,
   shortcutDebounceMs: SHORTCUT_DEBOUNCE_MS,
   statusHideMs: STATUS_HIDE_MS,
 } = petBehaviorConfig.app;
-const DIALOG_SHORTCUT = "Ctrl+Alt+T";
-const DEV_PANEL_SHORTCUT = "Ctrl+Alt+D";
 // Engine constant, do not tune
 const WINDOW_MOVEMENT_TICK_MS = 16;
 const HITBOX_DRAG_START_THRESHOLD_PX = 6;
@@ -346,6 +347,7 @@ function App() {
   const lastShortcutAtRef = useRef(0);
   const lastDialogShortcutAtRef = useRef(0);
   const lastDevPanelShortcutAtRef = useRef(0);
+  const lastExitShortcutAtRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
   const movementTickTimerRef = useRef<number | null>(null);
   const movementRuntimeRef = useRef<WindowMovementRuntime>(createInitialWindowMovementRuntime());
@@ -505,6 +507,14 @@ function App() {
     }
     machineRef.current.dispatch(event);
   }, []);
+
+  const requestExit = useCallback(() => {
+    pendingExitRef.current = true;
+    void PetContextService.markCleanExit().catch((error) => {
+      console.error("[PetContext] markCleanExit failed:", error);
+    });
+    dispatch({ type: "user.exit" });
+  }, [dispatch]);
 
   useDragDropFeed({
     dispatch: (event) => dispatch(event as PetEvent),
@@ -1094,7 +1104,7 @@ function App() {
       if (emitStatus) {
         showStatus(
           ignore
-            ? "Click-through ON | Press Ctrl+Alt+P to interact"
+            ? `Click-through ON | Press ${CLICK_THROUGH_SHORTCUT} to interact`
             : "Click-through OFF | Dragging is available",
         );
       }
@@ -1127,11 +1137,19 @@ function App() {
         logDialogDebug("player.ready.rebind.skipMachineRestart", {
           state: machine.getSnapshot().state,
         });
-        machine.init(player);
+        machine.init(player, {
+          onExitRequest: () => {
+            void invoke("app_quit");
+          },
+        });
         return;
       }
 
-      machine.init(player);
+      machine.init(player, {
+        onExitRequest: () => {
+          void invoke("app_quit");
+        },
+      });
 
       machineUnsubscribeRef.current?.();
       machineUnsubscribeRef.current = machine.subscribe((nextState, snapshot) => {
@@ -1195,84 +1213,92 @@ function App() {
         },
       );
 
-      // TODO(Phase B): Load real values from SQLite PetContext.
-      machine.start({
-        isNewDay: false,
-        lastExitClean: true,
-      });
-      logDialogDebug("machine.start.done", {
-        state: machine.getSnapshot().state,
-      });
-      if (IS_DEV_BUILD) {
-        setDevSnapshot(machine.getSnapshot());
-      }
-      setUiPetState(machine.getSnapshot().state);
-      if (petBehaviorConfig.hungry.evaluateOnStartup) {
-        void (async () => {
-          try {
-            const lastCsvImportDate = await PetContextService.getLastCsvImportDate();
-            const nowDate = formatLocalDate(new Date());
-            const { isHungry, daysSinceFeed } = decideHungry({
-              lastCsvImportDate: lastCsvImportDate ?? "",
-              nowDate,
-              thresholdDays: petBehaviorConfig.hungry.thresholdDays,
-            });
-
-            if (IS_DEV_BUILD) {
-              console.log(
-                "[hungry] decided: isHungry=%s, daysSinceFeed=%d, threshold=%d, lastImport=%s",
-                isHungry,
-                daysSinceFeed,
-                petBehaviorConfig.hungry.thresholdDays,
-                lastCsvImportDate ?? "(never)",
-              );
-            }
-
-            machine.dispatch({ type: "hungry.set", value: isHungry });
-            setDevHungryInfo({ lastCsvImportDate, daysSinceFeed });
-
-            if (IS_DEV_BUILD) {
-              setDevSnapshot(machine.getSnapshot());
-            }
-          } catch (error) {
-            console.error("[hungry] decision failed:", error);
-          }
-        })();
-      }
-
-      machineReadyRef.current = true;
-      pendingExitRef.current = false;
-      allowWindowCloseRef.current = false;
-
       void (async () => {
-        if (schedulerRef.current) {
-          return;
+        const sessionBootstrap = await PetContextService.loadSessionBootstrap();
+        if (IS_DEV_BUILD) {
+          console.log(
+            "[bootstrap] isNewDay=%s lastExitClean=%s",
+            sessionBootstrap.isNewDay,
+            sessionBootstrap.lastExitClean,
+          );
         }
 
-        try {
-          const [setupCompleted, token, dbId] = await Promise.all([
-            invoke<string | null>("config_get_value", { key: "setup_completed" }),
-            invoke<string | null>("config_get_value", { key: "notionToken" }),
-            invoke<string | null>("config_get_value", { key: "todoDbId" }),
-          ]);
+        machine.start(sessionBootstrap);
+        logDialogDebug("machine.start.done", {
+          state: machine.getSnapshot().state,
+        });
+        if (IS_DEV_BUILD) {
+          setDevSnapshot(machine.getSnapshot());
+        }
+        setUiPetState(machine.getSnapshot().state);
 
-          if (setupCompleted !== "1" || !token || !dbId) {
+        if (petBehaviorConfig.hungry.evaluateOnStartup) {
+          void (async () => {
+            try {
+              const lastCsvImportDate = await PetContextService.getLastCsvImportDate();
+              const nowDate = formatLocalDate(new Date());
+              const { isHungry, daysSinceFeed } = decideHungry({
+                lastCsvImportDate: lastCsvImportDate ?? "",
+                nowDate,
+                thresholdDays: petBehaviorConfig.hungry.thresholdDays,
+              });
+
+              if (IS_DEV_BUILD) {
+                console.log(
+                  "[hungry] decided: isHungry=%s, daysSinceFeed=%d, threshold=%d, lastImport=%s",
+                  isHungry,
+                  daysSinceFeed,
+                  petBehaviorConfig.hungry.thresholdDays,
+                  lastCsvImportDate ?? "(never)",
+                );
+              }
+
+              machine.dispatch({ type: "hungry.set", value: isHungry });
+              setDevHungryInfo({ lastCsvImportDate, daysSinceFeed });
+
+              if (IS_DEV_BUILD) {
+                setDevSnapshot(machine.getSnapshot());
+              }
+            } catch (error) {
+              console.error("[hungry] decision failed:", error);
+            }
+          })();
+        }
+
+        machineReadyRef.current = true;
+        pendingExitRef.current = false;
+        allowWindowCloseRef.current = false;
+
+        void (async () => {
+          if (schedulerRef.current) {
             return;
           }
 
-          schedulerRef.current = new ReminderScheduler({
-            notionService,
-            todoDbId: dbId,
-            dispatch,
-            resolveTarget: resolveReminderTarget,
-            getWorkareaBounds,
-            getIsDialogActive: () => dialogModeActiveRef.current,
-            onSnapshot: setSchedulerSnapshot,
-          });
-          schedulerRef.current.start();
-        } catch (error) {
-          console.error("[reminder] scheduler bootstrap failed:", error);
-        }
+          try {
+            const [setupCompleted, token, dbId] = await Promise.all([
+              invoke<string | null>("config_get_value", { key: "setup_completed" }),
+              invoke<string | null>("config_get_value", { key: "notionToken" }),
+              invoke<string | null>("config_get_value", { key: "todoDbId" }),
+            ]);
+
+            if (setupCompleted !== "1" || !token || !dbId) {
+              return;
+            }
+
+            schedulerRef.current = new ReminderScheduler({
+              notionService,
+              todoDbId: dbId,
+              dispatch,
+              resolveTarget: resolveReminderTarget,
+              getWorkareaBounds,
+              getIsDialogActive: () => dialogModeActiveRef.current,
+              onSnapshot: setSchedulerSnapshot,
+            });
+            schedulerRef.current.start();
+          } catch (error) {
+            console.error("[reminder] scheduler bootstrap failed:", error);
+          }
+        })();
       })();
     },
     [dispatch, getWorkareaBounds, requestDialogClose, requestDialogOpen, syncWindowMovementFromState],
@@ -1560,8 +1586,8 @@ function App() {
   }, [handleReminderDevAction]);
 
   const handleDevInjectExit = useCallback(() => {
-    dispatch({ type: "user.exit" });
-  }, [dispatch]);
+    requestExit();
+  }, [requestExit]);
 
   const handleDevInjectMovementArrive = useCallback(() => {
     const state = machineRef.current.getSnapshot().state;
@@ -1738,6 +1764,30 @@ function App() {
         failedShortcuts.push(DIALOG_SHORTCUT);
       }
 
+      try {
+        await register(EXIT_SHORTCUT, (event) => {
+          if (disposed) {
+            return;
+          }
+
+          const keyState = String(event.state ?? "").toLowerCase();
+          if (keyState !== "pressed") {
+            return;
+          }
+
+          const now = performance.now();
+          if (now - lastExitShortcutAtRef.current < SHORTCUT_DEBOUNCE_MS) {
+            return;
+          }
+
+          lastExitShortcutAtRef.current = now;
+          requestExit();
+        });
+      } catch (error) {
+        console.error(`Failed to register shortcut ${EXIT_SHORTCUT}:`, error);
+        failedShortcuts.push(EXIT_SHORTCUT);
+      }
+
       if (IS_DEV_BUILD) {
         try {
           await register(DEV_PANEL_SHORTCUT, (event) => {
@@ -1786,6 +1836,7 @@ function App() {
     };
   }, [
     requestDialogOpenFromPhysicalEvent,
+    requestExit,
     setClickThrough,
     setDevPanelOpenState,
     showStatus,
@@ -1874,8 +1925,7 @@ function App() {
           }
 
           event.preventDefault();
-          pendingExitRef.current = true;
-          dispatch({ type: "user.exit" });
+          requestExit();
         });
 
         if (disposed) {
@@ -1895,7 +1945,7 @@ function App() {
       closeUnlistenRef.current?.();
       closeUnlistenRef.current = null;
     };
-  }, [dispatch]);
+  }, [requestExit]);
 
   useEffect(() => {
     return () => {

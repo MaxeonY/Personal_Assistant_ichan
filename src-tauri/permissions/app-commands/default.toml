@@ -5,6 +5,7 @@ permissions = [
   "allow-first-run-close-wizard",
   "allow-window-minimize",
   "allow-window-toggle-maximize",
+  "allow-app-quit",
   "allow-first-run-check-notion-user",
   "allow-first-run-check-notion-database",
   "allow-first-run-check-deepseek",
@@ -29,6 +30,11 @@ commands.allow = ["window_minimize"]
 identifier = "allow-window-toggle-maximize"
 description = "Enables maximizing or restoring the current window."
 commands.allow = ["window_toggle_maximize"]
+
+[[permission]]
+identifier = "allow-app-quit"
+description = "Enables quitting the app process."
+commands.allow = ["app_quit"]
 
 [[permission]]
 identifier = "allow-first-run-check-notion-user"

@@ -1,8 +1,11 @@
 export const petBehaviorConfig = {
   app: {
-    clickThroughShortcut: "Ctrl+Alt+P",//切换全局快捷键
-    shortcutDebounceMs: 180,//快捷键防抖
-    statusHideMs: 1800,//状态提示 Toast 自动隐藏时间
+    clickThroughShortcut: "Ctrl+Alt+P",
+    dialogShortcut: "Ctrl+Alt+T",
+    devPanelShortcut: "Ctrl+Alt+D",
+    exitShortcut: "Ctrl+Alt+Q",
+    shortcutDebounceMs: 180,
+    statusHideMs: 1800,
   },
   windowMovement: {
     edgePaddingPx: 8,//窗口贴近工作区边缘时保留的安全距离
