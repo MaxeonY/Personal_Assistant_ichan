@@ -1,4 +1,4 @@
-# ICHAN Phase A 接口定稿 v1.3
+# ICHAN Phase A 接口定稿 v1.4
 
 **文件路径**: `docs/01_contracts/interface_v1_2.md`
 **范围**: Phase A 任务 2（动画播放器） / 任务 3（三层状态机最小可运行版）
@@ -27,7 +27,7 @@
 - §4.4 `StateMachine` 公共接口澄清：不引入 `setHungry(...)` 等绕过事件入口的 public 方法。
 - §3.4 `idle.drowsy exit` 口径统一：`4` 个源状态帧 + 目标态首帧自然衔接；若提及“第 5 帧”，仅指目标态首帧。
 
-### v1.3 变更摘要（相比 v1.2）
+### v1.4 变更摘要（相比 v1.2）
 - §4.2 `PetEvent` 新增 `dialog.open` / `dialog.close`，作为 talking 开关的正式意图事件。
 - 新增 `DialogOpenSource` / `DialogCloseReason` 类型定义。
 - `user.doubleClick` 降级为通知性事件，不再直接触发状态转换。
@@ -35,6 +35,10 @@
 
 ---
 
+### v1.4 变更摘要（相比 v1.3）
+- Added `StateMachineInitOptions.onExitRequest?: () => void` for process exit callback after farewell complete.
+- `onExitRequest` is a single-responsibility exit callback and should not carry persistence side effects.
+- B3-14 exit chain aligned: `requestExit -> farewell -> onExitRequest -> app_quit`.
 ## 1. 设计总则（硬约束，实现不得违反）
 
 1. **单向依赖**：StateMachine 依赖 AnimationPlayer，播放器不得反向持有状态机引用

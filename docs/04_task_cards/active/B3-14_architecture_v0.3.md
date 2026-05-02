@@ -1,6 +1,6 @@
-# B3-14 架构决议文档 v0.3
+# B3-14 架构决议文档 v0.4
 
-> **日期**: 2026-05-01
+> **日期**: 2026-05-02
 > **架构师**: Claude
 > **状态**: 锁定，作为B3-14任务卡细化阶段的输入
 > **基于**: `B3-14_field_research_report.md`（DeepSeek 实地调研）
@@ -11,9 +11,9 @@
 
 | 版本 | 日期 | 变更摘要 |
 |------|------|---------|
-| v0.1 | 2026-05-01 | 初版架构决议 |
-| v0.2 | 2026-05-01 | 项目负责人拍板后修订：D1 退出入口收敛为单一快捷键路径（删除右键菜单提案；任务栏图标改归 MVP 后）；D8 锁定 unclean 台词消费归 B3-5；§5 排除项新增"系统托盘 / 任务栏图标" |
-| v0.3 | 2026-05-01 | DeepSeek 任务卡细化阶段反馈 4 个待补充点的裁定合并入主文档：D2 修订（onExitRequest 单一退出职责，markCleanExit 由 App.tsx 在 dispatch 前 fire-and-forget 触发）；D4 补强错误处理；§5 必做项调整（L5 内联为 Step 0，必做项 10→11） |
+| v0.1 | 2026-05-02 | 初版架构决议 |
+| v0.2 | 2026-05-02 | 项目负责人拍板后修订：D1 退出入口收敛为单一快捷键路径（删除右键菜单提案；任务栏图标改归 MVP 后）；D8 锁定 unclean 台词消费归 B3-5；§5 排除项新增"系统托盘 / 任务栏图标" |
+| v0.4 | 2026-05-02 | DeepSeek 任务卡细化阶段反馈 4 个待补充点的裁定合并入主文档：D2 修订（onExitRequest 单一退出职责，markCleanExit 由 App.tsx 在 dispatch 前 fire-and-forget 触发）；D4 补强错误处理；§5 必做项调整（L5 内联为 Step 0，必做项 10→11） |
 
 ---
 
@@ -103,7 +103,7 @@ DeepSeek 调研挖出三件影响架构的关键事实：
 
 **理由**：调研报告 §1.1 暴露了"X 按钮路径不可达"的事实后，正常退出实际只缺一个入口；快捷键最简单、最易记，且复用现有 globalShortcut 基础设施；右键菜单和托盘对核心痛点是冗余覆盖，徒增 MVP 工程量。
 
-### D2：onExitRequest 单一退出职责（v0.3 修订）
+### D2：onExitRequest 单一退出职责（v0.4 修订）
 
 `StateMachineInitOptions` 新增 `onExitRequest?: () => void`，唯一职责是 farewell `onComplete` 切换到 `deep_sleep` 后通知壳进程退出。唯一调用方是 App.tsx：`onExitRequest = () => invoke('app_quit')`。
 持久化标脏（markCleanExit）不走此回调，由 App.tsx 在 `dispatch({ type: 'user.exit' })` 调用点之前 fire-and-forget 触发：
@@ -148,7 +148,7 @@ function requestExit(): void {
 2. 计算 `isNewDay` / 解读 `lastExitClean`
 3. `setLastExitClean(false)` + `setLastSeenDate(today)` 双写
 4. 返回 SessionBootstrap
-错误处理策略（v0.3 补强）：
+错误处理策略（v0.4 补强）：
 实现必须按以下结构降级，不允许抛异常阻塞 machine.start()：
 ```ts
 async function loadSessionBootstrap(): Promise<SessionBootstrap> {

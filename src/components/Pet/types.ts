@@ -166,8 +166,9 @@ export type PetEvent =
   | { type: 'hungry.set'; value: boolean };
 
 export interface StateMachineInitOptions {
-  /** 可注入时钟，方便测试 */
+  /** monotonic clock for testability */
   now?: () => TimestampMs;
+  onExitRequest?: () => void;
 }
 
 export interface StateMachineSnapshot {

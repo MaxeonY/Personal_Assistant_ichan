@@ -351,6 +351,12 @@
           "markdownDescription": "Default permissions for workout commands\n#### This default permission set includes:\n\n- `allow-workout-import-csv`\n- `allow-workout-get-last-workout`\n- `allow-workout-get-body-part-recency`"
         },
         {
+          "description": "Enables quitting the app process.",
+          "type": "string",
+          "const": "allow-app-quit",
+          "markdownDescription": "Enables quitting the app process."
+        },
+        {
           "description": "Enables chat_append_message command.",
           "type": "string",
           "const": "allow-chat-append-message",

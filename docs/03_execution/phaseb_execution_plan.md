@@ -1,4 +1,4 @@
-﻿# Phase B Execution Plan
+# Phase B Execution Plan
 
 
 > 版本：
@@ -15,6 +15,7 @@
   > v2.11 - 2026.04.27 - 文档落地对齐：补建 notion_schema + 引用一致化
   > v2.12 - 2026.04.27 - 新增 B1-10A 任务日志（anchor 过渡重构 + callback 稳定性修复）
   > v2.13 - 2026.04.29 - 新增 B2-13 任务日志（chat 历史 FTS5 关键词记忆库）
+  > v2.14 - 2026.05.02 - 新增 B3-14 任务日志（退出机制与 clean-exit 持久化）
 > 范围：规划方案及对应实现细则
 
 ## 第1章：任务全景与分层
@@ -24,7 +25,7 @@
 - 第二层：交互/UI 设计（需定稿形态和规则，可用 mock 验证）
 - 第三层：集成（把服务接到 UI，通过状态机串起来）
 
-### 1.2 Backlog 分层表（12项）
+### 1.2 Backlog 分层表（14项）
 
 | 编号 | 任务 | 层级 | 性质 | 依赖（编号） | 说明 |
 |---|---|---|---|---|---|
@@ -41,6 +42,7 @@
 | 11 | 对话记录 SQLite schema | 第一层 | 纯功能 | - | 消息历史存储与分页读取 |
 | 12 | hungry 自动判定逻辑 | 第一层 | 纯功能 | 1 | 基于 `lastCsvImportDate` 自动判定 hungry |
 | 13 | chat 历史 FTS5 关键词记忆库 | 第一层 | 纯功能 | 11 | 实现 ChatMemoryStore，为 chat() 提供长期记忆召回 |
+| 14 | B3-14 退出机制与 clean-exit 持久化 | 第三层 | 混合 | 9,11 | 完成 requestExit/farewell/app_quit 链路、lastExitClean 启动写读、快捷键配置集中化与权限补齐 |
 
 ### 1.3 兼容性边界（不改动项）
 - `MajorState` 固定五态：`idle | talking | eating | happy | reminding`。
@@ -361,6 +363,26 @@ interface ChatMemoryStore {
 
 ---
 
+### 2.14 任务14：B3-14 退出机制与 clean-exit 持久化
+
+```ts
+interface ExitFlowInput {
+  trigger: 'shortcut' | 'close_button' | 'window_close';
+}
+
+interface ExitFlowOutput {
+  quitRequested: boolean;
+  cleanExitMarked: boolean;
+}
+```
+
+- 对接点：`requestExit()`、`StateMachine.enterFarewell()`、`onExitRequest -> invoke('app_quit')`。
+- 持久化：`PetContextService.loadSessionBootstrap()` 读取 `lastExitClean`，并在启动时写入 dirty-bit；`markCleanExit()` 在用户主动退出链路中 fire-and-forget。
+- 快捷键：`dialogShortcut` / `devPanelShortcut` / `exitShortcut` 统一收口到 `petBehaviorConfig.app`。
+- 权限：Tauri 权限补齐 `allow-app-quit`。
+- 状态机影响：不新增 `MajorState`；farewell 期间保持事件闸门，避免被其他事件打断。
+
+---
 ## 第3章：依赖图与推荐执行顺序
 
 ### 3.1 文本依赖图
@@ -376,6 +398,9 @@ interface ChatMemoryStore {
 7 -> 5
 1,3,4,7,8,9,10,11 -> 5
 11 -> 13
+9 -> 14
+11 -> 14
+14 -> 5
 ```
 
 ### 3.2 推荐执行批次
@@ -414,13 +439,14 @@ interface ChatMemoryStore {
   - `ChatMemoryStore.query()` 在测试用对话历史上能返回相关召回片段，集成到 `getChatContext()` 后 chat 输出能引用历史信息。
 
 #### 3.2.4 Batch 3：端到端集成
-- 范围：5
+- 范围：5, 14
 - 目标：晨间仪式完整链路通过。
 - 输入：Batch 0/1/2 全部产出。
 - DoD：
   - 启动触发晨间仪式；
   - Notion/Workout/DeepSeek 数据整合、文案生成、计划写回闭环；
   - 对话 UI 与状态回归一致，无悬挂 talking/hungry 误态。
+  - 完成 clean-Exit 退出
 ---
 
 
@@ -1369,3 +1395,34 @@ Tauri 侧在 `src-tauri/src/lib.rs` 注册上述命令，并在 `src-tauri/permi
 - `pnpm tauri dev`：需在本地 GUI 会话完成主路径与 dialog gate 手测。
 - `pnpm tauri build --debug`：本轮未执行。
 - 备注：验收通过
+
+### 5.15 B3-14
+
+执行范围与对应任务
+- 执行批次：Batch 3
+- 对应任务：B3-14（退出机制、clean-exit 持久化、快捷键配置集中化）
+- 当前状态：已完成实现，待本地 GUI 全链路验收
+
+#### 5.15.1 实施摘要
+- 新增 `onExitRequest` 注入链路，farewell onComplete 后触发 app 退出命令。
+- `requestExit()` 统一承担 `markCleanExit()` fire-and-forget + `dispatch(user.exit)`。
+- `PetContextService.loadSessionBootstrap()` 接入真实 `lastExitClean` 与 `isNewDay` 计算，并在启动时写入 dirty-bit。
+- Step0 完成：快捷键迁移至 `petBehaviorConfig.app`（dialog/devPanel/exit）。
+- Tauri 权限补齐：`allow-app-quit` 写入 `src-tauri/permissions/app-commands/default.toml`。
+
+#### 5.15.2 变更文件
+- `src/App.tsx`
+- `src/state/StateMachine.ts`
+- `src/services/PetContextService.ts`
+- `src/components/Pet/types.ts`
+- `src/config/petBehaviorConfig.ts`
+- `src-tauri/src/lib.rs`
+- `src-tauri/capabilities/default.json`
+- `src-tauri/permissions/app-commands/default.toml`
+- `src/services/__tests__/PetContextService.test.ts`
+- `src/state/StateMachine.farewell.test.ts`
+
+#### 5.15.3 验证结果
+- `cargo check --manifest-path src-tauri/Cargo.toml`：通过。
+- `pnpm tauri dev`：在当前沙箱环境受限（spawn EPERM）未能完成 GUI 启动；用户本机已定位并修复权限缺失问题（`allow-app-quit`）。
+

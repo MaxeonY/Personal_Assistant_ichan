@@ -1,6 +1,6 @@
 ﻿# Behavior_Config
 
-> **版本**: v1.4 - 2026-04-30（B2-6 待办提醒参数入表）
+> **版本**: v1.5 - 2026-05-02（B2-6 待办提醒参数入表）
 
 > 文档定位：本文件为 `src/config/petBehaviorConfig.ts` 的参数说明文档。
 > 职责：解释参数分组、参数语义、当前冻结基线、后续调参边界。
@@ -132,4 +132,13 @@
 6. `talking/eating/happy/reminding` 的反馈节奏是否过快/过慢？
 7. `Ctrl+Alt+P` 去抖后是否仍稳定可用（不重复触发）？
 8. Toast 显示与隐藏时长是否可读且不打扰主工作流？
+
+
+
+## 变更补充（v1.5 / B3-14）
+
+- `app.dialogShortcut：对话快捷键。
+- `app.devPanelShortcut：开发面板快捷键（DEV）。
+- `app.exitShortcut：触发 farewell 并退出应用的快捷键。
+
 

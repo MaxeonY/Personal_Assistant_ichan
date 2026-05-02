@@ -1,6 +1,6 @@
-# B3-14 退出机制 — 实施级任务卡 v2.0
+# B3-14 退出机制 — 实施级任务卡 v2.1
 
-> **日期**: 2026-05-01
+> **日期**: 2026-05-02
 > **基于**: `B3-14_architecture_v0.3.md`（已锁定）+ `B3-14_field_research_report.md`
 > **状态**: 草案，待项目负责人审阅
 > **起草人**：DeepSeek V4-Pro
@@ -460,4 +460,11 @@ Step 6 (验证)
 
 ---
 
-*任务卡 v2.0 完。等待项目负责人审阅后定稿。*
+*任务卡 v2.1 完。等待项目负责人审阅后定稿。*
+
+## v2.1 变更记录（2026-05-02）
+
+- 已完成任务卡对应实现：`App.tsx`、`StateMachine.ts`、`PetContextService.ts`、`petBehaviorConfig.ts`。
+- 已补齐退出权限映射：`src-tauri/permissions/app-commands/default.toml` 增加 `allow-app-quit`。
+- 已完成测试补充：`PetContextService.test.ts`、`StateMachine.farewell.test.ts`。
+- 已执行 `cargo check --manifest-path src-tauri/Cargo.toml` 并通过。

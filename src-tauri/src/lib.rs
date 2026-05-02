@@ -72,6 +72,12 @@ fn window_toggle_maximize(window: tauri::Window) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+fn app_quit(app: tauri::AppHandle) -> Result<(), String> {
+    app.exit(0);
+    Ok(())
+}
+
 async fn send_request(request: reqwest::RequestBuilder) -> Result<HttpStatusResult, String> {
     let response = request
         .send()
@@ -220,6 +226,7 @@ pub fn run() {
             first_run_close_wizard,
             window_minimize,
             window_toggle_maximize,
+            app_quit,
             first_run_check_notion_user,
             first_run_check_notion_database,
             first_run_check_deepseek

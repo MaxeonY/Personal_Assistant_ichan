@@ -1,6 +1,6 @@
 # param_audit.md
 
-> **版本**: v1.0 - 2026-04-27  
+> **版本**: v1.1 - 2026-05-02  
 > **范围**: 全仓库已实施脚本的参数汇总（代码中的常量、Token、阈值、超时、限幅、尺寸）  
 > **真值源**: 以实际代码为准，参数变更应同步更新本文档
 
@@ -14,7 +14,9 @@
 | `version` | `"0.1.0"` | `src-tauri/tauri.conf.json` | 应用版本 |
 | `identifier` | `"com.root.desktop-pet"` | `src-tauri/tauri.conf.json` | 应用包标识 |
 | `clickThroughShortcut` | `"Ctrl+Alt+P"` | `src/config/petBehaviorConfig.ts` | 全局快捷键：穿透点击 |
-| `devPanelShortcut` | `"Ctrl+Alt+D"` | `src/App.tsx` | 全局快捷键：切换 DevPanel（仅 DEV） |
+| `dialogShortcut` | `"Ctrl+Alt+T"` | `src/config/petBehaviorConfig.ts` | Global shortcut: open/focus dialog |
+| `devPanelShortcut` | `"Ctrl+Alt+D"` | `src/config/petBehaviorConfig.ts` | Global shortcut: toggle DevPanel (DEV only) |
+| `exitShortcut` | `"Ctrl+Alt+Q"` | `src/config/petBehaviorConfig.ts` | Global shortcut: trigger farewell then exit app || `devPanelShortcut` | `"Ctrl+Alt+D"` | `src/config/petBehaviorConfig.ts` | 全局快捷键：切换 DevPanel（仅 DEV） |
 | `shortcutDebounceMs` | `180` | `src/config/petBehaviorConfig.ts` | 快捷键去抖间隔 (ms) |
 | `statusHideMs` | `1800` | `src/config/petBehaviorConfig.ts` | 状态提示自动隐藏 (ms) |
 
